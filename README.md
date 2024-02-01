@@ -1,2 +1,2 @@
 # CraftingInterpreters
-My interpreter and selected answers to exercises, done in C++ throughout.
+My interpreter and selected answers to exercises, done in Java and C++ throughout.
