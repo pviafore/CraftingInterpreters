@@ -102,6 +102,43 @@
 
     From a grammar perspective, you'd have something like
 
-    `BLOCKCOMMENT = (<BLOCKCOMMENT> | .)*`
+    `BLOCKCOMMENT = /* (<BLOCKCOMMENT> | .)* */`
 
     See Scanner.java for information on how to do this.
+
+# Chapter 5
+
+1)  Rewrite the grammar without notational sugar:
+
+    ```
+    expr -> ( "(" ( expr (", expr)* )? ")" | "." IDENTIFIER )+
+        |   NUMBER
+        |   IDENTIFIER
+    ```
+
+    It can be simplified as follows:
+
+        expr -> identifier
+        expr -> number
+        expr -> expr subexpr
+
+        subexpr -> subexpr subexpr
+        subexpr -> "." IDENTIFIER
+        subexpr -> "(" args ")"
+
+        args -> expr
+        args -> expr "," args
+
+    This gives you grammars like abc.def(ghi, 5.3, jkl). You now have nested function calls. You can get some silly things like 1.2.3(4.5.6), which doesn't quite work, but we can catch that in the parser.
+
+2)  If a Visitor pattern lets us add functions really easily on types, what is the equivalent in a functional language to add new types that has a bundle of operations.
+
+    You can use the factory pattern. Using Elixir:
+
+    `def create_obj() do %{ :foo => doSomething, :bar => doSomethingElse}  end`
+
+    THis way, you can create a map that has the foo and bar functions automatically on it(you can override them by setting them) You can now pass this map into anything that might need a foo or bar. (you could also make a method that takes a map and adds these to it)
+
+3)  Make a Reverse Polish Notation Printer 
+
+    See [RpnPrinter.java](jlox/jlox/src/main/java/com/patviafore/lox/RpnPrinter.java)
