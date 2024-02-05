@@ -142,3 +142,27 @@
 3)  Make a Reverse Polish Notation Printer 
 
     See [RpnPrinter.java](jlox/jlox/src/main/java/com/patviafore/lox/RpnPrinter.java)
+
+# Chapter 5
+
+1)  Add a comma expression.
+
+    See the codebase.
+
+    Grammar is as follows:
+
+        comma -> equality (, equality)*
+
+2)   Add support for ternary operator?.  What is it's precedence and is it left-associative or right-associative.  
+
+    See the code for ternary operations. It is right associative, as it needs to make sure that it you don't get a weird condition where both conditions are true in a nested, such as 
+
+    `b==c ? true : true ? true : false`
+
+    In this case, if you were left associative, you would have `b==c ? true : true` which will always be true, which might confuse people.
+
+    As far as the precedence of the middle, it's assumed that it always is an entire expression, so it has pretty high precedence.
+
+3)  Add error handling when a binary expression is missing a left operator.
+
+    See code.

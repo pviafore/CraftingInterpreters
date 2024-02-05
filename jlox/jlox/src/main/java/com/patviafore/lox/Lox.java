@@ -7,6 +7,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Optional;
 
 public class Lox { 
 
@@ -48,14 +49,25 @@ public class Lox {
     private static void run(String source) {
         Scanner scanner = new Scanner(source);
         List<Token> tokens = scanner.scanTokens();
+        Parser parser = new Parser(tokens);
+        Optional<Expr> expression = parser.parse();
+        if(hadError) return; // hadError assumes that we are returning null
 
-        for(Token token: tokens){
-            System.out.println(token);
-        }
+        System.out.println(new AstPrinter().print(expression.get()));
+
     }
 
     static void error(int line, String message) {
         report(line, "", message);
+    }
+    
+    static void error(Token token, String message) {
+        if(token.type == TokenType.EOF){
+            report(token.line, " at end", message);
+        }
+        else { 
+            report(token.line, " at '" + token.lexeme + "'", message);
+        }
     }
 
     private static void report(int line, String where, String message){
