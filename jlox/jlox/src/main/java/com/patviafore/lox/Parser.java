@@ -32,12 +32,6 @@ public class Parser {
     }
 
     private Expr binaryParse(ExprBinaryParse parse, TokenType... tokens){
-        if(match(tokens)){
-            // read the next expression
-            Token prev = previous();
-            expression();
-            error(prev, "Expected expression, instead got operator");
-        }
         Expr expr = parse.parse();
         while(match(tokens)) {
             Token operator = previous();

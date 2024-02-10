@@ -11,7 +11,9 @@ import java.util.Optional;
 
 public class Lox { 
 
+    private static final Interpreter interpreter = new Interpreter();
     static boolean hadError = false;
+    static boolean hadRuntimeError = false;
     public static void main(String[] args) throws IOException {
         if(args.length > 1) {
             System.out.println("Usage: jlox [script]");
@@ -30,7 +32,7 @@ public class Lox {
         byte[] bytes = Files.readAllBytes(Paths.get(path));
         run(new String(bytes, Charset.defaultCharset()));
 
-        if(hadError) System.exit(65);
+        if(hadError) System.exit(70);
     }
 
     private static void runPrompt() throws IOException {
@@ -53,7 +55,7 @@ public class Lox {
         Optional<Expr> expression = parser.parse();
         if(hadError) return; // hadError assumes that we are returning null
 
-        System.out.println(new AstPrinter().print(expression.get()));
+        interpreter.interpret(expression.get());
 
     }
 
@@ -73,5 +75,10 @@ public class Lox {
     private static void report(int line, String where, String message){
         System.err.println("[line " + line + "] Error" + where + ": " + message);
         hadError=true;
+    }
+
+    static void runtimeError(RuntimeError error) {
+        System.err.println(error.getMessage() + "\n[line " + error.token.line + "]");
+        hadRuntimeError = true;
     }
 }

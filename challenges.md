@@ -143,7 +143,7 @@
 
     See [RpnPrinter.java](jlox/jlox/src/main/java/com/patviafore/lox/RpnPrinter.java)
 
-# Chapter 5
+# Chapter 6
 
 1)  Add a comma expression.
 
@@ -166,3 +166,25 @@
 3)  Add error handling when a binary expression is missing a left operator.
 
     See code.
+
+# Chapter 7
+
+1)  Would you extend Lox to support comparing other types? If so, which pairs of types do you allow and how do you define their ordering? Justify your choices and compare them to other languages.
+
+    I would allow user-defined comparisons ala C++ or Python, where you define a comparator on an object. Maybe Strings could have it so that it has default lexicographical ordering, but it should be an opt-in thing. By default, there shouldn't be mixed comparisons, because I think that strays too far into implicit casting, which nears JavaScript territory, which I'm not a fan of.
+
+    I prefer C++'s `operator<` compared to Python's `__lt__` because I think it converys the usage better. 
+
+2)  Make string concatenation behave if either element is a String.
+
+    See Interpreter.java.
+
+3)  What happens if you divide by zero? What do you think should happen? What do other languages do?
+
+    Right now, it returns infinity. I've seen a variety of different rationale:
+
+*   C++ has UB (YOLO!). Floats do IEEE, which is actually well defined. I assume this is because you don't need to do a whole lot of error checking on division, which speeds things up.
+*   Java and Python have exceptions when you divide by zero, allowing users to check for it and catch it.
+*   Pony, sets it to zero, which you can read about [here](https://tutorial.ponylang.io/gotchas/divide-by-zero.html)
+
+    See Interpreter.java for handling this. I'm choosing to have a runtime error as I think a user deserves to catch it, but not crash the program. I am explicitly not handling IEEE floats, because I am not distinguishing between them in the code.

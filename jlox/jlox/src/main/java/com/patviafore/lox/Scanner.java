@@ -157,7 +157,8 @@ class Scanner {
         advance(); // the closing "
         
         // trim  surrounding quotes 
-        addToken(TokenType.STRING, lexeme());
+        String value = source.substring(start+1, current - 1);
+        addToken(TokenType.STRING, value);
     }
 
     private boolean isDigit(char c) {
