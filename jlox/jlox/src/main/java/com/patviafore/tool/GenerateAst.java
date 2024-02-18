@@ -14,10 +14,19 @@ public class GenerateAst {
 
         defineAst(outputDir, "Expr", Arrays.asList(
             "Ternary   : Expr condition, Token operator, Expr left, Expr right",
+            "Assign    : Token name, Expr value",
             "Binary    : Expr left, Token operator, Expr right",
             "Grouping  : Expr expression",
             "Literal   : Object value",
+            "Variable  : Token name",
             "Unary     : Token operator, Expr right"
+        ));
+
+        defineAst(outputDir, "Stmt", Arrays.asList(
+            "Block      : List<Stmt> statements",
+            "Expression : Expr expression",
+            "Print      : Expr expression",
+            "Var        : Token name, Expr initializer"
         ));
     }
 

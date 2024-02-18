@@ -188,3 +188,19 @@
 *   Pony, sets it to zero, which you can read about [here](https://tutorial.ponylang.io/gotchas/divide-by-zero.html)
 
     See Interpreter.java for handling this. I'm choosing to have a runtime error as I think a user deserves to catch it, but not crash the program. I am explicitly not handling IEEE floats, because I am not distinguishing between them in the code.
+
+# Chapter 8
+
+1)  Make it so that the REPL can take an expression or statement
+
+    See [Lox.java](jlox/jlox/src/main/java/com/patviafore/lox/Lox.java). It now checks to see if there are any semicolons in the statement, and if there are, treats it as a statement, otherwise, it assumes a single expression.
+
+2)  Make it so you have to initialize variables
+
+    In [Environment.java](jlox/jlox/src/main/java/com/patviafore/lox/Environment.java), we are checking if the value is set to to a special type called Uninitialized (We want to have null values be okay to use)
+
+3)  What happens if you shadow a variable and initialize it to the outer variable?
+
+    It actually behaves as I expect, by evaluating the rhs first. In other languages, it doesn't quite behave this way. Python throws an unbound error, and C/C++ has UB.
+
+    

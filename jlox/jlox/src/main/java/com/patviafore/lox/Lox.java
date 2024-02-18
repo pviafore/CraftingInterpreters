@@ -7,7 +7,6 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Optional;
 
 public class Lox { 
 
@@ -52,10 +51,17 @@ public class Lox {
         Scanner scanner = new Scanner(source);
         List<Token> tokens = scanner.scanTokens();
         Parser parser = new Parser(tokens);
-        Optional<Expr> expression = parser.parse();
+        Boolean hasSemicolon = tokens.stream().anyMatch((Token t) -> t.type == TokenType.SEMICOLON);
+        if(!hasSemicolon) {
+            Expr expr = parser.parseExpression();
+            System.out.println(interpreter.stringify(interpreter.evaluate(expr)));
+        }
+        else {
+            List<Stmt> stmts = parser.parse();
+            interpreter.interpret(stmts);
+        }
         if(hadError) return; // hadError assumes that we are returning null
 
-        interpreter.interpret(expression.get());
 
     }
 

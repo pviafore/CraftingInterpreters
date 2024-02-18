@@ -1,8 +1,10 @@
 package com.patviafore.lox;
 
+import com.patviafore.lox.Expr.Assign;
 import com.patviafore.lox.Expr.Grouping;
 import com.patviafore.lox.Expr.Literal;
 import com.patviafore.lox.Expr.Unary;
+import com.patviafore.lox.Expr.Variable;
 
 public class AstPrinter implements Expr.Visitor<String> {
     String print(Expr expr) {
@@ -59,6 +61,16 @@ public class AstPrinter implements Expr.Visitor<String> {
         );
 
         System.out.println(new AstPrinter().print(expression));
+    }
+
+    @Override
+    public String visitVariableExpr(Variable expr) {
+        return "var " + expr.name;
+    }
+
+    @Override
+    public String visitAssignExpr(Assign expr) {
+        return expr.name + " = " + expr.value;
     }
 
     
