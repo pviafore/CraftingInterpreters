@@ -1,8 +1,12 @@
 package com.patviafore.lox;
 
+import java.util.stream.Collectors;
+
 import com.patviafore.lox.Expr.Assign;
+import com.patviafore.lox.Expr.Call;
 import com.patviafore.lox.Expr.Grouping;
 import com.patviafore.lox.Expr.Literal;
+import com.patviafore.lox.Expr.Logical;
 import com.patviafore.lox.Expr.Unary;
 import com.patviafore.lox.Expr.Variable;
 
@@ -71,6 +75,16 @@ public class AstPrinter implements Expr.Visitor<String> {
     @Override
     public String visitAssignExpr(Assign expr) {
         return expr.name + " = " + expr.value;
+    }
+
+    @Override
+    public String visitLogicalExpr(Logical expr) {
+        return print(expr.left) + " " + expr.operator.lexeme + " " + print(expr.right);
+    }
+
+    @Override
+    public String visitCallExpr(Call expr) {
+        return print(expr.callee) + "(" + expr.arguments.stream().map((Expr e) -> print(e)).collect(Collectors.joining(",")) + ")";
     }
 
     

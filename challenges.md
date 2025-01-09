@@ -129,7 +129,7 @@
         args -> expr
         args -> expr "," args
 
-    This gives you grammars like abc.def(ghi, 5.3, jkl). You now have nested function calls. You can get some silly things like 1.2.3(4.5.6), which doesn't quite work, but we can catch that in the parser.
+    This gives you grammars like abc.def(ghi, 5.3, jkl). You now have nested function calls. You can get some silly things like 1(4.fed), which doesn't quite work, but we can catch that in the parser.
 
 2)  If a Visitor pattern lets us add functions really easily on types, what is the equivalent in a functional language to add new types that has a bundle of operations.
 
@@ -167,6 +167,8 @@
 
     See code.
 
+    NB: Looking at this at a later date, I don't see it in the code, so I assume it was removed with a refactor. You would have to check if the first token is a binary operator, (and not an unary operator), and if it is, parse the following expression, but throw an error and discard it.
+
 # Chapter 7
 
 1)  Would you extend Lox to support comparing other types? If so, which pairs of types do you allow and how do you define their ordering? Justify your choices and compare them to other languages.
@@ -203,4 +205,35 @@
 
     It actually behaves as I expect, by evaluating the rhs first. In other languages, it doesn't quite behave this way. Python throws an unbound error, and C/C++ has UB.
 
-    
+# Chapter 9
+
+1) How do languages with dynamic dispatch handle control flow with no if statement.
+
+    If we take a look at Elixir, we can see how it does it. In essence, you define two functions with different tages
+
+```
+    iex(4)> foo = fn true -> 5    
+    ...(4)>          false -> 4
+    ...(4)> end
+    #Function<42.3316493/1 in :erl_eval.expr/6>
+    iex(5)> foo.(true)         
+    5
+    iex(6)> foo.(false)        
+    4
+```
+
+    At runtime, the invocation will pick which one to choose.
+
+2) How do languages handle looping with no control flow?
+
+    Take a look at Haskell, which uses recursion to handle it's looping. However, it must have tail-call recursion, which lets the compiler replace a recursive function call with a jump to the beginning of the frame. Otherwise, a long loop would exhaust the stack.
+
+3)  Add a break statement, allowing it to be nested in a loop.
+
+# Chapter 10
+
+1) What does smalltalk do for argument/parameter number mismatch?
+
+    The arguments are actually part of the function name, so you're still just looking for a function name that matches those arguments, and no checking of how many commas you have or colons is needed.
+
+2) Add anonymous function expressions

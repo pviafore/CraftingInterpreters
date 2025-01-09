@@ -1,24 +1,56 @@
 package com.patviafore.lox;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.patviafore.lox.Expr.Binary;
+import com.patviafore.lox.Expr.Call;
 import com.patviafore.lox.Expr.Grouping;
 import com.patviafore.lox.Expr.Literal;
 import com.patviafore.lox.Expr.Ternary;
 import com.patviafore.lox.Expr.Unary;
+import com.patviafore.lox.Stmt.Break;
 import com.patviafore.lox.Stmt.Expression;
+import com.patviafore.lox.Stmt.Function;
+import com.patviafore.lox.Stmt.If;
 import com.patviafore.lox.Stmt.Print;
 
 public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
-    private Environment environment = new Environment();
+    final Environment globals = new Environment();
+    private Environment environment = globals;
+    private int loopDepth = 0;
+    private Boolean hitBreak = false;
+
+    Interpreter() {
+        globals.define("clock", new LoxCallable(){ 
+            @Override
+            public int arity() { return 0; }
+
+            @Override
+            public Object call(Interpreter interpreter, List<Object> arguments) {
+                return (double) System.currentTimeMillis() / 1000.0;
+            }
+
+            @Override
+            public String toString() { return "<native fn>";}
+        });
+    }
 
     public void interpret(List<Stmt> statements) {
         try {
             for(Stmt statement: statements) {
                 execute(statement);
             }
+        }
+        catch(RuntimeError error) {
+            Lox.runtimeError(error);
+        }
+    }
+
+    public void interpretExpression(Expr expression) {
+        try {
+            System.out.println(stringify(evaluate(expression)));
         }
         catch(RuntimeError error) {
             Lox.runtimeError(error);
@@ -66,7 +98,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
                 return(double)left < (double)right;
             case LESS_EQUAL: 
                 checkNumberOperands(expr.operator, left, right);
-                return(double)left < (double)right;
+                return(double)left <= (double)right;
             case BANG_EQUAL: return !isEqual(left,right);
             case EQUAL_EQUAL: return isEqual(left,right);
             case MINUS: 
@@ -81,6 +113,8 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
             case STAR: 
                 checkNumberOperands(expr.operator, left, right);
                 return (double)left*(double)right;
+            case COMMA:
+                return right;
             case PLUS:
                 if(left instanceof Double && right instanceof Double){
                     return (double)left + (double)right;
@@ -203,11 +237,98 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
             this.environment = environment;
 
             for (Stmt statement : statements) {
+                if(hitBreak && loopDepth > 0){
+                    break;
+                }
                 execute(statement);
             }
         }
         finally {
             this.environment = previous;
         }
+    }
+
+    @Override
+    public Void visitIfStmt(If stmt) {
+        if (isTruthy(evaluate(stmt.condition))){
+            execute(stmt.thenBranch);
+        }
+        else if (stmt.elseBranch != null) {
+            execute(stmt.elseBranch);
+        }
+        return null;
+    }
+
+    @Override
+    public Object visitLogicalExpr(Expr.Logical expr) {
+        Object left = evaluate(expr.left);
+
+        if (expr.operator.type == TokenType.OR) {
+            if(isTruthy(left)) return left;
+        }
+        else {
+            if(!isTruthy(left)) return left;
+        }
+
+        return evaluate(expr.right);
+    }
+
+    @Override
+    public Void visitWhileStmt(Stmt.While stmt) {
+        try {
+            loopDepth++;
+            while (isTruthy(evaluate(stmt.condition))) {
+                execute(stmt.body);
+                if(hitBreak) {
+                    hitBreak = false;
+                    break;
+                }
+            }
+            return null;
+        }
+        finally {
+            loopDepth--;
+        }
+    }
+
+    @Override
+    public Void visitBreakStmt(Break stmt) {
+        hitBreak = true;
+        return null;
+    }
+
+    @Override
+    public Object visitCallExpr(Call expr) {
+        Object callee = evaluate(expr.callee);
+        List<Object> arguments = new ArrayList<>();
+        for (Expr argument : expr.arguments) {
+            arguments.add(evaluate(argument));
+        }
+
+       if(!(callee instanceof LoxCallable)) {
+            throw new RuntimeError(expr.paren, "Can only call functions and classes.");
+        }
+
+        LoxCallable function = (LoxCallable)callee;
+
+        if(arguments.size() != function.arity()) {
+            throw new RuntimeError(expr.paren, "Expected " + function.arity() + " arguments but got " + arguments.size() + ".");
+        }
+        return function.call(this, arguments);
+    }
+
+    @Override
+    public Void visitFunctionStmt(Function stmt) {
+        LoxFunction function = new LoxFunction(stmt, environment);
+        environment.define(stmt.name.lexeme, function);
+        return null;
+    }
+
+    @Override
+    public Void visitReturnStmt(Stmt.Return stmt) {
+        Object value = null;
+        if (stmt.value != null) value = evaluate(stmt.value);
+
+        throw new Return(value);
     }
 }

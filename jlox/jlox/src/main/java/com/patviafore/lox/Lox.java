@@ -31,7 +31,8 @@ public class Lox {
         byte[] bytes = Files.readAllBytes(Paths.get(path));
         run(new String(bytes, Charset.defaultCharset()));
 
-        if(hadError) System.exit(70);
+        if(hadError) System.exit(65);
+        if(hadRuntimeError) System.exit(70);
     }
 
     private static void runPrompt() throws IOException {
@@ -54,14 +55,14 @@ public class Lox {
         Boolean hasSemicolon = tokens.stream().anyMatch((Token t) -> t.type == TokenType.SEMICOLON);
         if(!hasSemicolon) {
             Expr expr = parser.parseExpression();
-            System.out.println(interpreter.stringify(interpreter.evaluate(expr)));
+            if(hadError) return; // hadError assumes that we are returning null
+            interpreter.interpretExpression(expr);
         }
         else {
             List<Stmt> stmts = parser.parse();
+            if(hadError) return; // hadError assumes that we are returning null
             interpreter.interpret(stmts);
         }
-        if(hadError) return; // hadError assumes that we are returning null
-
 
     }
 

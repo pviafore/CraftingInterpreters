@@ -17,9 +17,11 @@ class Scanner {
     static { 
         keywords = new HashMap<>();
         keywords.put("and", TokenType.AND);
+        keywords.put("break", TokenType.BREAK);
         keywords.put("class", TokenType.CLASS);
         keywords.put("else", TokenType.ELSE);
         keywords.put("false", TokenType.FALSE);
+        keywords.put("fun", TokenType.FUN);
         keywords.put("for", TokenType.FOR);
         keywords.put("if", TokenType.IF);
         keywords.put("nil", TokenType.NIL);

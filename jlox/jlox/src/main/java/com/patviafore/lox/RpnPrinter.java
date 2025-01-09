@@ -1,8 +1,12 @@
 package com.patviafore.lox;
 
+import java.util.stream.Collectors;
+
 import com.patviafore.lox.Expr.Assign;
+import com.patviafore.lox.Expr.Call;
 import com.patviafore.lox.Expr.Grouping;
 import com.patviafore.lox.Expr.Literal;
+import com.patviafore.lox.Expr.Logical;
 import com.patviafore.lox.Expr.Unary;
 import com.patviafore.lox.Expr.Variable;
 
@@ -79,5 +83,14 @@ public class RpnPrinter implements Expr.Visitor<String> {
         return expr.name + " " + expr.value + " =";
     }
 
+    @Override
+    public String visitLogicalExpr(Logical expr) {
+        return print(expr.left) + " " + print(expr.right) + " " + expr.operator.lexeme;
+    }
+
+    @Override
+    public String visitCallExpr(Call expr) {
+        return "("+ expr.arguments.stream().map((Expr e) -> {return print(e);}).collect(Collectors.joining(" ")) + ") " + print(expr.callee) + " call";
+    }
     
 }
