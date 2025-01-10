@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.patviafore.lox.Expr.Binary;
 import com.patviafore.lox.Expr.Call;
+import com.patviafore.lox.Expr.Closure;
 import com.patviafore.lox.Expr.Grouping;
 import com.patviafore.lox.Expr.Literal;
 import com.patviafore.lox.Expr.Ternary;
@@ -315,6 +316,12 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
             throw new RuntimeError(expr.paren, "Expected " + function.arity() + " arguments but got " + arguments.size() + ".");
         }
         return function.call(this, arguments);
+    }
+
+    @Override
+    public Object visitClosureExpr(Closure expr) {
+        LoxClosure f = new LoxClosure(expr, environment);
+        return f;
     }
 
     @Override

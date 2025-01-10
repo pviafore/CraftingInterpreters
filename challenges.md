@@ -237,3 +237,14 @@
     The arguments are actually part of the function name, so you're still just looking for a function name that matches those arguments, and no checking of how many commas you have or colons is needed.
 
 2) Add anonymous function expressions
+
+See the code for LoxClosure, and the Closure expression.
+
+I had to tweak how I was parsing/interpreting expressions and statements to get fun(){}; to just work. We also now check to see if there is an anonymous function
+when we get to parsing function statements, and if it is, we need to just use expression statement instead. This allows things like `fun(){ print "hello";}();`
+
+3) What happens if you define a variable that shadows a parameter in a function body? What about in other languages.
+
+Lox continues on merrily, as does Python and C++. JavaScript errors out on this when using `const` or `let`. 
+
+ 

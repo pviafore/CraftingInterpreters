@@ -24,7 +24,7 @@ public class Lox {
         else {
             runPrompt();
         }
-    }
+    } 
 
 
     private static void runFile(String path) throws IOException {
@@ -52,18 +52,16 @@ public class Lox {
         Scanner scanner = new Scanner(source);
         List<Token> tokens = scanner.scanTokens();
         Parser parser = new Parser(tokens);
-        Boolean hasSemicolon = tokens.stream().anyMatch((Token t) -> t.type == TokenType.SEMICOLON);
-        if(!hasSemicolon) {
-            Expr expr = parser.parseExpression();
-            if(hadError) return; // hadError assumes that we are returning null
-            interpreter.interpretExpression(expr);
-        }
-        else {
+        if(parser.isStatement()){
             List<Stmt> stmts = parser.parse();
-            if(hadError) return; // hadError assumes that we are returning null
+            if(hadError) return;
             interpreter.interpret(stmts);
         }
-
+        else {
+            Expr expr = parser.parseExpression();
+            if(hadError) return;
+            interpreter.interpretExpression(expr);
+        }
     }
 
     static void error(int line, String message) {

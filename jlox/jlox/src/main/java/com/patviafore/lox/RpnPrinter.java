@@ -4,6 +4,7 @@ import java.util.stream.Collectors;
 
 import com.patviafore.lox.Expr.Assign;
 import com.patviafore.lox.Expr.Call;
+import com.patviafore.lox.Expr.Closure;
 import com.patviafore.lox.Expr.Grouping;
 import com.patviafore.lox.Expr.Literal;
 import com.patviafore.lox.Expr.Logical;
@@ -91,6 +92,12 @@ public class RpnPrinter implements Expr.Visitor<String> {
     @Override
     public String visitCallExpr(Call expr) {
         return "("+ expr.arguments.stream().map((Expr e) -> {return print(e);}).collect(Collectors.joining(" ")) + ") " + print(expr.callee) + " call";
+    }
+
+    @Override
+    public String visitClosureExpr(Closure expr) {
+        return "("+ expr.params.stream().map((Token t) -> {return t.lexeme;}).collect(Collectors.joining(" ")) + ") fun"; 
+            
     }
     
 }

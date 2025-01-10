@@ -20,6 +20,20 @@ public class Parser {
         this.tokens = tokens;
     }
 
+    boolean isStatement(){   
+        ArrayList<TokenType> statements = new ArrayList<TokenType>();
+        statements.add(TokenType.FOR);
+        statements.add(TokenType.WHILE);
+        statements.add(TokenType.LEFT_BRACE);
+        statements.add(TokenType.BREAK);
+        statements.add(TokenType.RETURN);
+        statements.add(TokenType.FUN);
+        statements.add(TokenType.IF);
+        statements.add(TokenType.PRINT);
+        statements.add(TokenType.VAR);
+        return statements.contains(tokens.get(0).type) || tokens.get(tokens.size() - 1).type == TokenType.SEMICOLON;
+    }
+
     List<Stmt> parse() {
         List<Stmt> statements = new ArrayList<>();
         while(!isAtEnd()) {
@@ -60,7 +74,7 @@ public class Parser {
 
     private Stmt statement() {
         if(match(TokenType.FOR)) return forStatement();
-        if(match(TokenType.FUN)) return function(FunctionType.FUNCTION);
+        if(check(TokenType.FUN)) return function(FunctionType.FUNCTION);
         if(match(TokenType.IF)) return ifStatement();
         if(match(TokenType.WHILE)) return whileStatement();
         if(match(TokenType.BREAK)) return breakStatement();
@@ -178,7 +192,11 @@ public class Parser {
         return new Stmt.Expression(expr);
     }
 
-    private Stmt.Function function(FunctionType kind) {
+    private Stmt function(FunctionType kind) {
+        if(!checkNext(TokenType.IDENTIFIER)){
+            return expressionStatement();
+        }
+        advance(); // already checked the fun token
         Token name = consume(TokenType.IDENTIFIER, "Expect " + kind.toString().toLowerCase() + " name.");
         consume(TokenType.LEFT_PAREN, "Expect '(' after " + kind.toString().toLowerCase() + " name.");
         List<Token> parameters = new ArrayList<>();
@@ -322,7 +340,7 @@ public class Parser {
     }
 
     private Expr call() {
-        Expr expr = primary();
+        Expr expr = closure();
         while (true) { 
             if(match(TokenType.LEFT_PAREN)) { 
                 expr = finishCall(expr);
@@ -347,6 +365,26 @@ public class Parser {
 
         Token paren = consume(TokenType.RIGHT_PAREN, "Expect ')' after arguments.");
         return new Expr.Call(callee, paren, arguments);
+    }
+
+    private Expr closure() {
+        if(match(TokenType.FUN)){
+            consume(TokenType.LEFT_PAREN, "Expect '(' after function expression");
+            List<Token> parameters = new ArrayList<>();
+            if(!check(TokenType.RIGHT_PAREN)){
+                do {
+                    if(parameters.size() >= 255) {
+                        error(peek(), "Can't have more than 255 parameters");
+                    }
+                    parameters.add(consume(TokenType.IDENTIFIER, "Expect parameter name."));
+                } while (match(TokenType.COMMA));
+            }
+            consume(TokenType.RIGHT_PAREN, "Expect ')' after arguments.");
+            consume(TokenType.LEFT_BRACE, "Expect '{' after arguments.");
+
+            return new Expr.Closure(parameters, block());
+        }
+        return primary();
     }
 
     private Expr primary() {
@@ -384,6 +422,12 @@ public class Parser {
     private boolean check(TokenType type) {
         if(isAtEnd()) return false;
         return peek().type == type;
+    }
+    
+    private boolean checkNext(TokenType type) {
+        if(isAtEnd()) return false;
+        if(tokens.get(current + 1).type == TokenType.EOF) return false;
+        return tokens.get(current + 1).type == type;
     }
 
     private Token advance() {

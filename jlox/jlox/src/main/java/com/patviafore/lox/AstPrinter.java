@@ -4,6 +4,7 @@ import java.util.stream.Collectors;
 
 import com.patviafore.lox.Expr.Assign;
 import com.patviafore.lox.Expr.Call;
+import com.patviafore.lox.Expr.Closure;
 import com.patviafore.lox.Expr.Grouping;
 import com.patviafore.lox.Expr.Literal;
 import com.patviafore.lox.Expr.Logical;
@@ -85,6 +86,11 @@ public class AstPrinter implements Expr.Visitor<String> {
     @Override
     public String visitCallExpr(Call expr) {
         return print(expr.callee) + "(" + expr.arguments.stream().map((Expr e) -> print(e)).collect(Collectors.joining(",")) + ")";
+    }
+    
+    @Override
+    public String visitClosureExpr(Closure expr) {
+        return "fun (" + expr.params.stream().map((Token t) -> t.lexeme).collect(Collectors.joining(",")) + ")";
     }
 
     
