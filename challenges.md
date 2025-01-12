@@ -247,4 +247,26 @@ when we get to parsing function statements, and if it is, we need to just use ex
 
 Lox continues on merrily, as does Python and C++. JavaScript errors out on this when using `const` or `let`. 
 
- 
+ # Chapter 11
+
+ 1) Why is it safe to eagerly define the variable bound to a function's name as opposed to other variables
+
+A function's name cannot be redefined in the same execution, the body happens in a separate scope. There is no risk of referring to the function when we bind the name or
+reading a variable from the wrong scope.
+
+2)  What happens when you try to define a local variable that refers to the same name.
+
+Python will error out `UnboundLocalError: cannot access local variable 'x' where it is not associated with a value`, Putting `global` or using it in global space is fine though.
+
+JavaScript does an error too -> can't access lexical declaration before initialization, which is the same as globals.
+
+C++, unsurprisingly, let's it ride.
+
+I like having it as an error explicitly, because I can't think of a reason why you would want to do this, as well as catching potential shadowing problems. If you needed
+to do something for some reason, it's just an extra temp declaration or rename, which should be cheap.
+
+
+
+3) Extend the resolver to report if a local variable is never used.
+
+See the code in Resolver.java.

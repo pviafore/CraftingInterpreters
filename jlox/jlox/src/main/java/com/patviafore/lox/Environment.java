@@ -1,11 +1,13 @@
 package com.patviafore.lox;
 
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
 
 public class Environment {
     final Environment enclosing;
     private final Map<String, Object> values = new HashMap<>();
+    private final ArrayList<Object> indexedValues = new ArrayList<Object>(); // this will only work for local values
 
     Environment() {
         enclosing = null;
@@ -17,6 +19,8 @@ public class Environment {
 
     void define(String name, Object value){
         values.put(name, value);
+        indexedValues.add(value); // we rely on the resolver having the same order as the interpreters to that indices work 
+
     }
 
     void defineUnitialized(String name) {
@@ -48,6 +52,22 @@ public class Environment {
 
         throw undefinedVariable(name);
 
+    }
+
+    Object getAt(int distance, int index) {
+        return ancestor(distance).indexedValues.get(index);
+    }
+    
+    void assignAt(int distance, int index, Object value) {
+        ancestor(distance).indexedValues.set(index, value);
+    }
+
+    Environment ancestor(int distance) {
+        Environment environment = this;
+        for(int i = 0; i < distance; i++){
+            environment = environment.enclosing;
+        }
+        return environment;
     }
 
     RuntimeError undefinedVariable(Token name) {

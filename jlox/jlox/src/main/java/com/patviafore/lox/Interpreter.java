@@ -1,7 +1,9 @@
 package com.patviafore.lox;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.patviafore.lox.Expr.Binary;
 import com.patviafore.lox.Expr.Call;
@@ -18,7 +20,18 @@ import com.patviafore.lox.Stmt.Print;
 
 public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
+    private class NodeMetadata {
+
+        NodeMetadata(int distance, int offset) {
+            this.distance = distance;
+            this.offset = offset;
+        }
+        int distance = 0;
+        int offset = 0;
+
+    }
     final Environment globals = new Environment();
+    private final Map<Expr, NodeMetadata> locals = new HashMap<>();
     private Environment environment = globals;
     private int loopDepth = 0;
     private Boolean hitBreak = false;
@@ -216,15 +229,31 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     @Override
     public Object visitVariableExpr(Expr.Variable expr){
-        return environment.get(expr.name);
+        return lookUpVariable(expr.name, expr);
+    }
+
+    private Object lookUpVariable(Token name, Expr expr) {
+        NodeMetadata metadata = locals.get(expr);
+        if(metadata != null) {
+            return environment.getAt(metadata.distance, metadata.offset);
+        } else {
+            return globals.get(name);
+        }
     }
 
     @Override
     public Object visitAssignExpr(Expr.Assign expr){
         Object value = evaluate(expr.value);
-        environment.assign(expr.name, value);
+
+        NodeMetadata metadata = locals.get(expr);
+        if(metadata != null) {
+            environment.assignAt(metadata.distance, metadata.offset, value);
+        } else {
+            globals.assign(expr.name, value);
+        }
         return value;
     }
+
     
     @Override
     public Void visitBlockStmt(Stmt.Block stmt){
@@ -337,5 +366,9 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         if (stmt.value != null) value = evaluate(stmt.value);
 
         throw new Return(value);
+    }
+
+    void resolve(Expr expr, int depth, int index) {
+        locals.put(expr, new NodeMetadata(depth, index));
     }
 }
