@@ -7,7 +7,8 @@ import java.util.List;
 public class Parser {
 
     enum FunctionType {
-        FUNCTION
+        FUNCTION, 
+        METHOD
     }
 
     private static class ParseError extends RuntimeException {}
@@ -22,6 +23,7 @@ public class Parser {
 
     boolean isStatement(){   
         ArrayList<TokenType> statements = new ArrayList<TokenType>();
+        statements.add(TokenType.CLASS);
         statements.add(TokenType.FOR);
         statements.add(TokenType.WHILE);
         statements.add(TokenType.LEFT_BRACE);
@@ -73,8 +75,15 @@ public class Parser {
     }
 
     private Stmt statement() {
+        if(match(TokenType.CLASS)) return classDeclaration();
         if(match(TokenType.FOR)) return forStatement();
-        if(check(TokenType.FUN)) return function(FunctionType.FUNCTION);
+        if(check(TokenType.FUN)) {
+            if(!checkNext(TokenType.IDENTIFIER)){
+                advance(); // already checked the fun token
+                return expressionStatement();
+            }
+            return function(FunctionType.FUNCTION);
+        }
         if(match(TokenType.IF)) return ifStatement();
         if(match(TokenType.WHILE)) return whileStatement();
         if(match(TokenType.BREAK)) return breakStatement();
@@ -192,11 +201,7 @@ public class Parser {
         return new Stmt.Expression(expr);
     }
 
-    private Stmt function(FunctionType kind) {
-        if(!checkNext(TokenType.IDENTIFIER)){
-            return expressionStatement();
-        }
-        advance(); // already checked the fun token
+    private Stmt.Function function(FunctionType kind) {
         Token name = consume(TokenType.IDENTIFIER, "Expect " + kind.toString().toLowerCase() + " name.");
         consume(TokenType.LEFT_PAREN, "Expect '(' after " + kind.toString().toLowerCase() + " name.");
         List<Token> parameters = new ArrayList<>();
@@ -267,6 +272,10 @@ public class Parser {
             if(expr instanceof Expr.Variable) {
                 Token name = ((Expr.Variable)expr).name;
                 return new Expr.Assign(name, value);
+            }
+            else if (expr instanceof Expr.Get) { 
+                Expr.Get get = (Expr.Get) expr;
+                return new Expr.Set(get.object, get.name, value);
             }
 
             error(equals, "Invalid assignment target.");
@@ -345,6 +354,10 @@ public class Parser {
             if(match(TokenType.LEFT_PAREN)) { 
                 expr = finishCall(expr);
             }
+            else if(match(TokenType.DOT)) {
+                Token name = consume(TokenType.IDENTIFIER, "Expect property name after '.'");
+                expr = new Expr.Get(expr, name);
+            }
             else {
                 break;
             }
@@ -396,6 +409,9 @@ public class Parser {
             return new Expr.Literal(previous().literal);
         }
 
+        if(match(TokenType.THIS)) {
+            return new Expr.This(previous());
+        }
         if(match(TokenType.IDENTIFIER)) {
             return new Expr.Variable(previous());
         }
@@ -477,6 +493,19 @@ public class Parser {
 
             advance();
         }
+    }
+
+    private Stmt classDeclaration() {
+        Token name = consume(TokenType.IDENTIFIER, "Expect class name. ");
+        consume(TokenType.LEFT_BRACE, "Expect '{' before class body");
+
+        List<Stmt.Function> methods = new ArrayList<>();
+        while (!check(TokenType.RIGHT_BRACE) && !isAtEnd()) {
+            methods.add(function(FunctionType.METHOD));
+        }
+
+        consume(TokenType.RIGHT_BRACE, "Expect '}' after class body");
+        return new Stmt.Class(name, methods);
     }
 
 }

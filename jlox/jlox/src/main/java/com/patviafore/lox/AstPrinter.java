@@ -5,9 +5,12 @@ import java.util.stream.Collectors;
 import com.patviafore.lox.Expr.Assign;
 import com.patviafore.lox.Expr.Call;
 import com.patviafore.lox.Expr.Closure;
+import com.patviafore.lox.Expr.Get;
 import com.patviafore.lox.Expr.Grouping;
 import com.patviafore.lox.Expr.Literal;
 import com.patviafore.lox.Expr.Logical;
+import com.patviafore.lox.Expr.Set;
+import com.patviafore.lox.Expr.This;
 import com.patviafore.lox.Expr.Unary;
 import com.patviafore.lox.Expr.Variable;
 
@@ -75,7 +78,7 @@ public class AstPrinter implements Expr.Visitor<String> {
 
     @Override
     public String visitAssignExpr(Assign expr) {
-        return expr.name + " = " + expr.value;
+        return expr.name + " = " + print(expr.value);
     }
 
     @Override
@@ -91,6 +94,21 @@ public class AstPrinter implements Expr.Visitor<String> {
     @Override
     public String visitClosureExpr(Closure expr) {
         return "fun (" + expr.params.stream().map((Token t) -> t.lexeme).collect(Collectors.joining(",")) + ")";
+    }
+
+    @Override
+    public String visitGetExpr(Get expr) {
+        return "." + expr.name;
+    }
+    
+    @Override
+    public String visitSetExpr(Set expr) {
+        return "." + expr.name + " = " + print(expr.value);
+    }
+
+    @Override
+    public String visitThisExpr(This expr) {
+        return "this";
     }
 
     
