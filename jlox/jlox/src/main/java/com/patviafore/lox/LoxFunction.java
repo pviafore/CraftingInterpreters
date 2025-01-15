@@ -27,7 +27,7 @@ public class LoxFunction implements LoxCallable {
             interpreter.executeBlock(declaration.body, environment);
         }
         catch(Return returnValue) {
-            if(isInitializer) return closure.getAt(0, 0); // assume this is the first thing defined
+            if(isInitializer && !declaration.isStaticMethod) return closure.getAt(0, 0); // assume this is the first thing defined
             return returnValue.value;
         }
         return null;
@@ -42,6 +42,14 @@ public class LoxFunction implements LoxCallable {
         Environment environment = new Environment(closure);
         environment.define("this", instance);
         return new LoxFunction(declaration, environment, isInitializer);
+    }
+
+    public boolean isStatic() {
+        return declaration.isStaticMethod;
+    }
+    
+    public boolean isProperty() {
+        return declaration.isProperty;
     }
     
 }

@@ -33,7 +33,7 @@ public class GenerateAst {
             "Break      : Token operator",
             "Class      : Token name, List<Stmt.Function> methods",
             "Expression : Expr expression",
-            "Function   : Token name, List<Token> params, List<Stmt> body",
+            "Function   : Token name, List<Token> params, List<Stmt> body, boolean isStaticMethod, boolean isProperty",
             "If         : Expr condition, Stmt thenBranch, Stmt elseBranch",
             "Print      : Expr expression",
             "Return     : Token keyword, Expr value",

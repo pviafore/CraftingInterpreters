@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
+
 public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void>{
     private final Interpreter interpreter;
     private class NodeMetadata { 
@@ -84,7 +85,9 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void>{
         CLOSURE,
         FUNCTION,
         INITIALIZER,
-        METHOD
+        METHOD,
+        PROPERTY,
+        STATICMETHOD
     }
 
     private enum ClassType { 
@@ -189,7 +192,14 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void>{
         if(!scopes.isEmpty()) {
             scopes.peek().markAsFunction(stmt.name); // for local functions - they can stay "unused"
         }
-        resolveFunction(stmt, FunctionType.FUNCTION);
+        FunctionType type = FunctionType.METHOD;
+        if(stmt.isStaticMethod) {
+            type = FunctionType.STATICMETHOD;
+        }
+        else if (stmt.isProperty) {
+            type = FunctionType.PROPERTY;
+        }
+        resolveFunction(stmt, type);
         return null;
     }
 
@@ -327,7 +337,7 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void>{
         beginScope();
         scopes.peek().markThisDefined();
         for(Stmt.Function method: stmt.methods) {
-            FunctionType declaration = FunctionType.FUNCTION;
+            FunctionType declaration = method.isStaticMethod ? FunctionType.STATICMETHOD : FunctionType.FUNCTION;
             if(method.name.lexeme.equals("init")) {
                 declaration = FunctionType.INITIALIZER;
             }
@@ -355,6 +365,10 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void>{
     public Void visitThisExpr(Expr.This expr) {
         if(currentClass == ClassType.NONE){
             Lox.error(expr.keyword, "Can't use 'this' outside of a class");
+            return null;
+        }
+        if(currentFunction == FunctionType.STATICMETHOD) {
+            Lox.error(expr.keyword, "Can't use 'this' in a static method");
             return null;
         }
         resolveLocal(expr, expr.keyword);

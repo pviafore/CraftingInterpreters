@@ -8,7 +8,9 @@ public class Parser {
 
     enum FunctionType {
         FUNCTION, 
-        METHOD
+        METHOD,
+        PROPERTY,
+        STATICMETHOD
     }
 
     private static class ParseError extends RuntimeException {}
@@ -216,7 +218,7 @@ public class Parser {
         consume(TokenType.RIGHT_PAREN, "Expect ')' after parameters.");
         consume(TokenType.LEFT_BRACE, "Expect '{' before " + kind.toString().toLowerCase() + " body.");
         List<Stmt> body = block();
-        return new Stmt.Function(name, parameters, body);
+        return new Stmt.Function(name, parameters, body, kind == FunctionType.STATICMETHOD, kind == FunctionType.PROPERTY);
     }
 
 
@@ -501,7 +503,18 @@ public class Parser {
 
         List<Stmt.Function> methods = new ArrayList<>();
         while (!check(TokenType.RIGHT_BRACE) && !isAtEnd()) {
-            methods.add(function(FunctionType.METHOD));
+            if(match(TokenType.CLASS)) {
+                methods.add(function(FunctionType.STATICMETHOD));
+            }
+            else if (check(TokenType.IDENTIFIER) && checkNext(TokenType.LEFT_BRACE)){
+                Token functionName = consume(TokenType.IDENTIFIER, "");
+                consume(TokenType.LEFT_BRACE, "");
+                List<Stmt> body = block();
+                methods.add(new Stmt.Function(functionName, new ArrayList<Token>(), body, false, true));
+            }
+            else {
+                methods.add(function(FunctionType.METHOD));
+            }
         }
 
         consume(TokenType.RIGHT_BRACE, "Expect '}' after class body");

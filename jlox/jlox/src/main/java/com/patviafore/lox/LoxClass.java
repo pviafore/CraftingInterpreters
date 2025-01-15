@@ -34,6 +34,12 @@ public class LoxClass implements LoxCallable {
         return instance;
     }
 
+    public Object getStatic(Token name) {
+        LoxFunction staticMethod = findMethod(name.lexeme);
+        if(!staticMethod.isStatic()) throw new RuntimeError(name, "Only static methods are allowed after a class name");
+        return staticMethod;
+    }
+
     public LoxFunction findMethod(String name) {
         if(methods.containsKey(name)){
             return methods.get(name);

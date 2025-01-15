@@ -272,3 +272,29 @@ See the code in Resolver.java.
 4) Handle environments by index based instead of map-based
 
 See the code in Resolver.java, Environment.java, and Interpreter.java. 
+
+
+# Chapter 12
+
+1) Create static methods
+
+Parser.java will read any class function as a static method. It will store in the AST that the method is static,
+which the resolver and interpreter can use to know if they need to be calling a method on the class itself, or on the
+instance. We can also verify that `this` can't be used in a static method.
+
+2) Create properties on a class
+
+Similar to static methods, I created a boolean that is passed through parse, resolve, and interpret to indicate if a function is a property.
+When performing a get expression, if we are getting a property, immediately call the function and return the return value of that function
+instead.
+
+3)  What are the trade-offs over controlling encapsulation (forcing getters/setters and free access)
+
+To me, it is a trade-off about developer experience vs developer safety. For languages that force encapsulation (or provide private/public
+access), you are giving the developer tools to avoid mistakes earlier on. If a developer is messing with class internals, or if they are violating
+invariants, you can avoid that completely by making those internals private. 
+
+However, forcing users to do this may be overkill for smaller programs, so languages with a more dynamic flair may opt to eschew this safety entirely,
+trusting developers to know how they want to use their objects best. Language implementers don't have to be concerned with setting up access rules,
+and developers are free to change things more easily. Additionally, these specifiers or access control might be statically determined, which would need
+additional semantic rules for how to handle dynamic fields being added to an object., ""
