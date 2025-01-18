@@ -10,6 +10,7 @@ import com.patviafore.lox.Expr.Grouping;
 import com.patviafore.lox.Expr.Literal;
 import com.patviafore.lox.Expr.Logical;
 import com.patviafore.lox.Expr.Set;
+import com.patviafore.lox.Expr.Super;
 import com.patviafore.lox.Expr.This;
 import com.patviafore.lox.Expr.Unary;
 import com.patviafore.lox.Expr.Variable;
@@ -110,6 +111,9 @@ public class AstPrinter implements Expr.Visitor<String> {
     public String visitThisExpr(This expr) {
         return "this";
     }
-
     
+    @Override
+    public String visitSuperExpr(Super expr) {
+        return "super." + expr.method.lexeme;
+    }
 }

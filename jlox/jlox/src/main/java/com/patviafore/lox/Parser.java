@@ -35,7 +35,7 @@ public class Parser {
         statements.add(TokenType.IF);
         statements.add(TokenType.PRINT);
         statements.add(TokenType.VAR);
-        return statements.contains(tokens.get(0).type) || tokens.get(tokens.size() - 1).type == TokenType.SEMICOLON;
+        return statements.contains(tokens.get(0).type) || tokens.get(tokens.size() - 2).type == TokenType.SEMICOLON;
     }
 
     List<Stmt> parse() {
@@ -424,6 +424,13 @@ public class Parser {
             return new Expr.Grouping(expr);
         }
 
+        if(match(TokenType.SUPER)) {
+            Token keyword = previous();
+            consume(TokenType.DOT, "Expect '.' after 'super'");
+            Token method = consume(TokenType.IDENTIFIER, "Expect superclass method name");
+            return new Expr.Super(keyword, method);
+        }
+
         throw error(peek(), "Expect expression.");
     }
 
@@ -499,6 +506,11 @@ public class Parser {
 
     private Stmt classDeclaration() {
         Token name = consume(TokenType.IDENTIFIER, "Expect class name. ");
+        Expr.Variable superclass = null;
+        if(match(TokenType.LESS)) {
+            consume(TokenType.IDENTIFIER, "Expect superclass name.");
+            superclass = new Expr.Variable(previous());
+        }
         consume(TokenType.LEFT_BRACE, "Expect '{' before class body");
 
         List<Stmt.Function> methods = new ArrayList<>();
@@ -518,7 +530,7 @@ public class Parser {
         }
 
         consume(TokenType.RIGHT_BRACE, "Expect '}' after class body");
-        return new Stmt.Class(name, methods);
+        return new Stmt.Class(name, superclass, methods);
     }
 
 }
