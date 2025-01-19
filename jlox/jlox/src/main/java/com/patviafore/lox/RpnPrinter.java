@@ -10,7 +10,7 @@ import com.patviafore.lox.Expr.Grouping;
 import com.patviafore.lox.Expr.Literal;
 import com.patviafore.lox.Expr.Logical;
 import com.patviafore.lox.Expr.Set;
-import com.patviafore.lox.Expr.Super;
+import com.patviafore.lox.Expr.Inner;
 import com.patviafore.lox.Expr.This;
 import com.patviafore.lox.Expr.Unary;
 import com.patviafore.lox.Expr.Variable;
@@ -119,7 +119,7 @@ public class RpnPrinter implements Expr.Visitor<String> {
     }
 
     @Override
-    public String visitSuperExpr(Super expr) {
-        return "super." + expr.method.lexeme;
+    public String visitInnerExpr(Inner expr) {
+        return "inner";
     }
 }

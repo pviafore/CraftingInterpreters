@@ -18,6 +18,9 @@ public class Parser {
     private final List<Token> tokens;
     private int current = 0;
     private int loopDepth = 0;
+    private boolean inMethod = false;
+    private Token currentFunction = null;
+    private Token currentClass = null;
 
     Parser(List<Token> tokens) {
         this.tokens = tokens;
@@ -205,6 +208,12 @@ public class Parser {
 
     private Stmt.Function function(FunctionType kind) {
         Token name = consume(TokenType.IDENTIFIER, "Expect " + kind.toString().toLowerCase() + " name.");
+        Token oldFunction = currentFunction;
+        boolean oldIsInMethod = inMethod;
+        if(kind == FunctionType.METHOD){
+            inMethod = true;
+            currentFunction = name;
+        }
         consume(TokenType.LEFT_PAREN, "Expect '(' after " + kind.toString().toLowerCase() + " name.");
         List<Token> parameters = new ArrayList<>();
         if(!check(TokenType.RIGHT_PAREN)){
@@ -218,6 +227,10 @@ public class Parser {
         consume(TokenType.RIGHT_PAREN, "Expect ')' after parameters.");
         consume(TokenType.LEFT_BRACE, "Expect '{' before " + kind.toString().toLowerCase() + " body.");
         List<Stmt> body = block();
+        currentFunction = oldFunction;
+        if(kind == FunctionType.METHOD){
+            inMethod = oldIsInMethod;
+        }
         return new Stmt.Function(name, parameters, body, kind == FunctionType.STATICMETHOD, kind == FunctionType.PROPERTY);
     }
 
@@ -424,11 +437,12 @@ public class Parser {
             return new Expr.Grouping(expr);
         }
 
-        if(match(TokenType.SUPER)) {
+        if(match(TokenType.INNER)) {
             Token keyword = previous();
-            consume(TokenType.DOT, "Expect '.' after 'super'");
-            Token method = consume(TokenType.IDENTIFIER, "Expect superclass method name");
-            return new Expr.Super(keyword, method);
+            if(!inMethod || currentClass == null || currentFunction == null) {
+                error(keyword, "Inner must be in a method.");
+            }
+            return new Expr.Inner(keyword, currentFunction, currentClass);
         }
 
         throw error(peek(), "Expect expression.");
@@ -506,6 +520,8 @@ public class Parser {
 
     private Stmt classDeclaration() {
         Token name = consume(TokenType.IDENTIFIER, "Expect class name. ");
+        Token oldClass = currentClass;
+        currentClass = name;
         Expr.Variable superclass = null;
         ArrayList<Expr.Variable> mixins = new ArrayList<Expr.Variable>();
         if(match(TokenType.LESS)) {
@@ -536,6 +552,7 @@ public class Parser {
         }
 
         consume(TokenType.RIGHT_BRACE, "Expect '}' after class body");
+        currentClass = oldClass;
         return new Stmt.Class(name, superclass, mixins, methods);
     }
 

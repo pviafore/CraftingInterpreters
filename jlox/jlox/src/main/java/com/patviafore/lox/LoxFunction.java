@@ -33,6 +33,10 @@ public class LoxFunction implements LoxCallable {
         return null;
     }
 
+    List<Token> getParams() {
+        return declaration.params;
+    }
+
     @Override
     public String toString() {
         return "<fn " + declaration.name.lexeme + ">";

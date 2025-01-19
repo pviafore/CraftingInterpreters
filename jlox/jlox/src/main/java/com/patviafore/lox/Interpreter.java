@@ -416,7 +416,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     public Object visitGetExpr(Expr.Get expr){
         Object object = evaluate(expr.object);
         if(object instanceof LoxInstance) {
-            Object subobject = ((LoxInstance) object).get(expr.name);
+            Object subobject = ((LoxInstance) object).get(expr.name, true);
             if(subobject instanceof LoxCallable && ((LoxFunction)subobject).isProperty()){
                 //immediately call property
                 return ((LoxFunction)subobject).call(this, new ArrayList<Object>());
@@ -449,14 +449,23 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     }
 
     @Override
-    public Object visitSuperExpr(Expr.Super expr) {
-        NodeMetadata metadata = locals.get(expr);
-        LoxClass superclass = (LoxClass) environment.getAt(metadata.distance, metadata.offset);
-        LoxInstance object = (LoxInstance)environment.getAt(metadata.distance - 1, 0); // assume this is always at offset 0 in the above scope
-        LoxFunction method = superclass.findMethod(expr.method.lexeme, expr.method);
-
-        if(method == null){
-            throw new RuntimeError(expr.method, "Undefined property '" + expr.method.lexeme + "'.");
+    public Object visitInnerExpr(Expr.Inner expr) {
+        LoxInstance object = (LoxInstance)environment.getAt(1, 0); // assume this is always at offset 0 in the above scope
+        // each inner knows what class it's on, so we can walk up the superclasses until we find that instance
+         
+        LoxClass cls = object.getClassType();
+        Token inner = new Token(TokenType.IDENTIFIER, "inner", "inner", 0);
+        LoxFunction superClassMethod = (LoxFunction)object.get(expr.method, true);
+        Stmt.Function noOp = new Function(inner, superClassMethod.getParams(), new ArrayList<Stmt>(), false, false);
+        LoxFunction method = new LoxFunction(noOp, environment, false);
+        LoxClass subclass = null;
+        while(cls != null){
+            if(cls.name.equals(expr.containingClass.lexeme)){
+                method = subclass.findMethod(expr.method.lexeme, expr.method, false);
+                break;
+            }
+            subclass = cls;
+            cls = cls.getSuperclass();
         }
         return method.bind(object);
     }

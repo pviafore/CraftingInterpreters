@@ -59,13 +59,6 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void>{
             reference(token);
         }
         
-        public void markSuperDefined(){
-            Token token = new Token(TokenType.SUPER, "super", "super", 0);
-            declare(token);
-            define(token);
-            reference(token);
-        }
-        
         public void markAsFunction(Token name) {
             nodes.get(name.lexeme).isFunction = true;
         }
@@ -357,11 +350,6 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void>{
             resolve(mixin);
         }
 
-        if(stmt.superclass != null){
-            beginScope();
-            scopes.peek().markSuperDefined();
-        }
-
         beginScope();
         scopes.peek().markThisDefined();
         for(Stmt.Function method: stmt.methods) {
@@ -373,7 +361,6 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void>{
         }
         endScope();
 
-        if(stmt.superclass != null) endScope();
         currentClass = enclosingClass;
         return null;
     }
@@ -407,13 +394,7 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void>{
 
 
     @Override
-    public Void visitSuperExpr(Expr.Super expr) {
-        if(currentClass == ClassType.NONE) { 
-            Lox.error(expr.keyword, "Can't use 'super' outside of class.");
-        }
-        else if (currentClass != ClassType.SUBCLASS) {
-            Lox.error(expr.keyword, "Can't use 'super' in a class with no superclass. ");
-        }
+    public Void visitInnerExpr(Expr.Inner expr) {
         resolveLocal(expr, expr.keyword);
         return null;
     }
