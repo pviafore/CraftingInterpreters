@@ -298,3 +298,44 @@ However, forcing users to do this may be overkill for smaller programs, so langu
 trusting developers to know how they want to use their objects best. Language implementers don't have to be concerned with setting up access rules,
 and developers are free to change things more easily. Additionally, these specifiers or access control might be statically determined, which would need
 additional semantic rules for how to handle dynamic fields being added to an object., ""
+
+# Chapter 13
+
+1) Many languages offer some form of multiple subclassing, where you have mix-ins, traits, multiple inheritance, etc. What is your preference and go implement it.
+
+A long time ago, multiple inheritance would have been my pick, but I almost never use it, nor do I think it's that great of a design (Diamond of death, Python's convoluted MRO, etc.). Java only allows single inheritance, but you can inherit multiple interfaces. I have come to like this more, but interfaces are kinda a byproduct of static typing 
+(I prefer generics with C++ more for this sort of thing). Really, I want one way that something can be a "is-a", but provide another way to reuse code. 
+What I'm going to implement for my version of lox, I am going to hae single inheritance (that is, only one class can be the superclass), but allow multiple mix-ins. 
+
+While `<` is used for subclassing, `+` will be used for mix-ins, with commas separating the clauses. Superclasses must be first.
+
+ Any class can be used as a mix-in, but some things apply: 
+
+* The constructor cannot be called for the mix-in, so state is discouraged
+* You can have many mix-ins, but it will be a runtime error if you call a method that is in more than one mix-in (if we allowed Class.method, we might be able to, but that syntax isn't there yet -- but we do have a future way of resolving this from the caller)
+* The mix-in's method are all available on the instantiated class
+* Mix-ins may reference methods or variables that are defined on the instantiated class
+
+This allows reuse and the basics of protocols, without promoting terrible inheritance chains.
+
+Example: 
+
+```
+class Averagable { 
+    average() {
+        return this.sum() / this.count();
+    }
+}
+
+class StudentScores +Avergable{ 
+    sum() {
+        return 500;
+    }
+
+    count() {
+        return 6;
+    }
+}
+
+print StudentScores().average();
+```

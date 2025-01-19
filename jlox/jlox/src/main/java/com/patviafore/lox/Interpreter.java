@@ -378,9 +378,17 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         if(stmt.superclass != null) {
             superclass = evaluate(stmt.superclass);
             if(!(superclass instanceof LoxClass)) {
-                throw new RuntimeError(stmt.superclass.name, "Superclass msut be a class.");
+                throw new RuntimeError(stmt.superclass.name, "Superclass must be a class.");
             }
 
+        }
+        ArrayList<LoxClass> mixins = new ArrayList<LoxClass>();
+        for(Expr.Variable mixin : stmt.mixins) {
+            Object mixinclass = evaluate(mixin);
+            if(!(mixinclass instanceof LoxClass)) {
+                throw new RuntimeError(mixin.name, "Mix-in must be a class.");
+            }
+            mixins.add((LoxClass)mixinclass);
         }
         environment.define(stmt.name.lexeme, null);
 
@@ -395,7 +403,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
             methods.put(method.name.lexeme, function);
         }
 
-        LoxClass cls = new LoxClass(stmt.name.lexeme, (LoxClass)superclass, methods);
+        LoxClass cls = new LoxClass(stmt.name.lexeme, (LoxClass)superclass, mixins, methods);
 
         if(superclass != null) {
             environment = environment.enclosing;
@@ -445,7 +453,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         NodeMetadata metadata = locals.get(expr);
         LoxClass superclass = (LoxClass) environment.getAt(metadata.distance, metadata.offset);
         LoxInstance object = (LoxInstance)environment.getAt(metadata.distance - 1, 0); // assume this is always at offset 0 in the above scope
-        LoxFunction method = superclass.findMethod(expr.method.lexeme);
+        LoxFunction method = superclass.findMethod(expr.method.lexeme, expr.method);
 
         if(method == null){
             throw new RuntimeError(expr.method, "Undefined property '" + expr.method.lexeme + "'.");

@@ -350,6 +350,13 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void>{
             resolve(stmt.superclass);
         }
 
+        for(Expr.Variable mixin: stmt.mixins){
+            if(stmt.name.lexeme.equals(mixin.name.lexeme)){
+                Lox.error(stmt.superclass.name, "A class can't mix itself in");
+            }
+            resolve(mixin);
+        }
+
         if(stmt.superclass != null){
             beginScope();
             scopes.peek().markSuperDefined();

@@ -507,9 +507,15 @@ public class Parser {
     private Stmt classDeclaration() {
         Token name = consume(TokenType.IDENTIFIER, "Expect class name. ");
         Expr.Variable superclass = null;
+        ArrayList<Expr.Variable> mixins = new ArrayList<Expr.Variable>();
         if(match(TokenType.LESS)) {
             consume(TokenType.IDENTIFIER, "Expect superclass name.");
             superclass = new Expr.Variable(previous());
+        }
+        while(match(TokenType.PLUS)){
+            consume(TokenType.IDENTIFIER, "Expect mix-in name.");
+            mixins.add(new Expr.Variable(previous()));
+
         }
         consume(TokenType.LEFT_BRACE, "Expect '{' before class body");
 
@@ -530,7 +536,7 @@ public class Parser {
         }
 
         consume(TokenType.RIGHT_BRACE, "Expect '}' after class body");
-        return new Stmt.Class(name, superclass, methods);
+        return new Stmt.Class(name, superclass, mixins, methods);
     }
 
 }
