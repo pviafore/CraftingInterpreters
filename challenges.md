@@ -339,3 +339,7 @@ class StudentScores +Avergable{
 
 print StudentScores().average();
 ```
+
+2) Reverse the inheritance so that "inner" is used instead of super(), like in `Beta`
+
+Check out the `beta-inner` branch.
