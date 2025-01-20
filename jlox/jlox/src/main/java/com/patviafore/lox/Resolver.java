@@ -398,4 +398,28 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void>{
         resolveLocal(expr, expr.keyword);
         return null;
     }
+
+    @Override
+    public Void visitAccessExpr(Expr.Access expr){
+        resolve(expr.callee);
+        resolve(expr.index);
+        return null;
+    }
+   
+    @Override
+    public Void visitSetAccessExpr(Expr.SetAccess expr){
+        resolve(expr.callee);
+        resolve(expr.index);
+        resolve(expr.value);
+        return null;
+    }
+
+
+    @Override
+    public Void visitListCollExpr(Expr.ListColl coll) {
+        for(Expr e: coll.contents){
+            resolve(e);
+        }
+        return null;
+    }
 }

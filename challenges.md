@@ -343,3 +343,17 @@ print StudentScores().average();
 2) Reverse the inheritance so that "inner" is used instead of super(), like in `Beta`
 
 Check out the `beta-inner` branch.
+
+3) Add one of your wanted features to the langauge
+
+I'm going to add arrays.
+
+```
+var l1 = [];
+var l2 = [1, 5+3, "abc", [1]];
+print l1;
+print l2.size();
+l1.append(3);
+l2.eraseAt(0);
+print l1+l2;
+```

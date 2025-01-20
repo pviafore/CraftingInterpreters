@@ -2,14 +2,17 @@ package com.patviafore.lox;
 
 import java.util.stream.Collectors;
 
+import com.patviafore.lox.Expr.Access;
 import com.patviafore.lox.Expr.Assign;
 import com.patviafore.lox.Expr.Call;
 import com.patviafore.lox.Expr.Closure;
 import com.patviafore.lox.Expr.Get;
 import com.patviafore.lox.Expr.Grouping;
+import com.patviafore.lox.Expr.ListColl;
 import com.patviafore.lox.Expr.Literal;
 import com.patviafore.lox.Expr.Logical;
 import com.patviafore.lox.Expr.Set;
+import com.patviafore.lox.Expr.SetAccess;
 import com.patviafore.lox.Expr.Inner;
 import com.patviafore.lox.Expr.This;
 import com.patviafore.lox.Expr.Unary;
@@ -122,4 +125,20 @@ public class RpnPrinter implements Expr.Visitor<String> {
     public String visitInnerExpr(Inner expr) {
         return "inner";
     }
+    
+    @Override
+    public String visitListCollExpr(ListColl expr) {
+        return "()" + expr.contents.stream().map((Expr e) -> print(e)).collect(Collectors.joining(", ")) + " list)";
+    }
+
+    @Override
+    public String visitAccessExpr(Access expr) {
+        return "("+print(expr.index)+ " " + print(expr.callee) +" access)";
+    }
+    
+    @Override
+    public String visitSetAccessExpr(SetAccess expr) {
+        return "("+print(expr.index)+ " " + print(expr.callee) + " " + print(expr.value) + " =)";
+    }
+
 }

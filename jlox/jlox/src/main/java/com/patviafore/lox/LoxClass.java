@@ -7,7 +7,7 @@ public class LoxClass implements LoxCallable {
     final String name;
     final LoxClass superclass;
     private final List<LoxClass> mixins;
-    private final Map<String, LoxFunction> methods;
+    protected final Map<String, LoxFunction> methods;
 
     LoxClass(String name, LoxClass superclass, List<LoxClass> mixins, Map<String, LoxFunction> methods) {
         this.name = name;

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.patviafore.lox.Expr.Binary;
 import com.patviafore.lox.Expr.Call;
@@ -64,7 +65,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     public void interpretExpression(Expr expression) {
         try {
-            System.out.println(stringify(evaluate(expression)));
+            System.out.println(StringUtils.stringify(evaluate(expression)));
         }
         catch(RuntimeError error) {
             Lox.runtimeError(error);
@@ -75,17 +76,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         stmt.accept(this);
     }
 
-    public String stringify(Object object) {
-        if(object == null) return "nil";
-        if(object instanceof Double) {
-            String text = object.toString();
-            if(text.endsWith(".0")) {
-                text = text.substring(0, text.length() - 2);
-            }
-            return text;
-        }
-        return object.toString();
-    }
+    
 
     @Override
     public Object visitTernaryExpr(Ternary expr) {
@@ -135,10 +126,13 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
                 }
 
                 if(left instanceof String){
-                    return (String)left + stringify(right);
+                    return (String)left + StringUtils.stringify(right);
                 }
                 if(right instanceof String) {
-                    return stringify(left) + (String) right;
+                    return StringUtils.stringify(left) + (String) right;
+                }
+                if(left instanceof LoxList && right instanceof LoxList){
+                    return LoxList.add((LoxList)left, (LoxList)right);
                 }
 
                 throw new RuntimeError(expr.operator, "Operands must be two numbers or two strings");
@@ -209,7 +203,7 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     @Override
     public Void visitPrintStmt(Print stmt) {
         Object value = evaluate(stmt.expression);
-        System.out.println(stringify(value));
+        System.out.println(StringUtils.stringify(value));
         return null;
     }
 
@@ -344,7 +338,12 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         if(arguments.size() != function.arity()) {
             throw new RuntimeError(expr.paren, "Expected " + function.arity() + " arguments but got " + arguments.size() + ".");
         }
-        return function.call(this, arguments);
+        try {
+            return function.call(this, arguments);
+        }
+        catch(RuntimeException e){
+            throw new RuntimeError(expr.paren, e.getMessage());
+        }
     }
 
     @Override
@@ -427,8 +426,8 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         else if(object instanceof LoxClass) {
             return ((LoxClass) object).getStatic(expr.name);
         }
-
         throw new RuntimeError(expr.name, "Only instances have properties");
+
     }
     
     @Override
@@ -442,6 +441,19 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         
         throw new RuntimeError(expr.name, "Only instances have properties");
     }
+
+    @Override
+    public Object visitSetAccessExpr(Expr.SetAccess expr){
+        Object object = evaluate(expr.callee);
+        if(object instanceof LoxList) { 
+            Object value = evaluate(expr.value);
+            ((LoxList) object).set(expr.bracket, evaluate(expr.index), value);
+            return value;
+        }
+        
+        throw new RuntimeError(expr.bracket, "Only lists can be accessed");
+    }
+
 
     @Override
     public Object visitThisExpr(Expr.This expr) {
@@ -468,6 +480,20 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
             cls = cls.getSuperclass();
         }
         return method.bind(object);
+    }
+
+    @Override
+    public Object visitListCollExpr(Expr.ListColl expr){
+        return new LoxList(new ArrayList<Object>(expr.contents.stream().map((Expr e) -> evaluate(e)).collect(Collectors.toList())), environment);
+    }
+
+    @Override
+    public Object visitAccessExpr(Expr.Access expr) {
+        Object object = evaluate(expr.callee);
+        if(!(object instanceof LoxList)) { 
+            throw new RuntimeError(expr.bracket, "May only all [] on a list");
+        }
+        return ((LoxList) object).at(expr.bracket, evaluate(expr.index));
     }
 
 }

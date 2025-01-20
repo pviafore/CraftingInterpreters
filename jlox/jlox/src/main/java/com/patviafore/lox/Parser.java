@@ -292,6 +292,10 @@ public class Parser {
                 Expr.Get get = (Expr.Get) expr;
                 return new Expr.Set(get.object, get.name, value);
             }
+            else if (expr instanceof Expr.Access) {
+                Expr.Access access = (Expr.Access) expr;
+                return new Expr.SetAccess(access.callee, access.bracket, access.index, value);
+            }
 
             error(equals, "Invalid assignment target.");
         }
@@ -359,7 +363,6 @@ public class Parser {
             Expr right = unary();
             return new Expr.Unary(operator, right);
         }
-
         return call();
     }
 
@@ -368,6 +371,9 @@ public class Parser {
         while (true) { 
             if(match(TokenType.LEFT_PAREN)) { 
                 expr = finishCall(expr);
+            }
+            if(match(TokenType.LEFT_BRACKET)){
+                expr = finishAccess(expr);
             }
             else if(match(TokenType.DOT)) {
                 Token name = consume(TokenType.IDENTIFIER, "Expect property name after '.'");
@@ -394,6 +400,13 @@ public class Parser {
         Token paren = consume(TokenType.RIGHT_PAREN, "Expect ')' after arguments.");
         return new Expr.Call(callee, paren, arguments);
     }
+
+    private Expr finishAccess(Expr callee) {
+        Expr index = ternary();
+        Token bracket = consume(TokenType.RIGHT_BRACKET, "Expect ']' after index");
+        return new Expr.Access(callee, bracket, index);
+    }
+    
 
     private Expr closure() {
         if(match(TokenType.FUN)){
@@ -437,6 +450,10 @@ public class Parser {
             return new Expr.Grouping(expr);
         }
 
+        if(match(TokenType.LEFT_BRACKET)){
+            return list();
+        }
+
         if(match(TokenType.INNER)) {
             Token keyword = previous();
             if(!inMethod || currentClass == null || currentFunction == null) {
@@ -446,6 +463,19 @@ public class Parser {
         }
 
         throw error(peek(), "Expect expression.");
+    } 
+
+    private Expr list() { 
+        Token leftBracket = previous();
+        ArrayList<Expr> expressions = new ArrayList<Expr>();
+        if(!check(TokenType.RIGHT_BRACKET)) {
+            do { 
+                expressions.add(ternary());
+            } while (match(TokenType.COMMA));
+        }
+        consume(TokenType.RIGHT_BRACKET, "List must end with a right bracket");
+        return new Expr.ListColl(leftBracket, expressions);
+
     }
 
     private boolean match(TokenType... types) {
