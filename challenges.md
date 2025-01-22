@@ -343,3 +343,57 @@ print StudentScores().average();
 2) Reverse the inheritance so that "inner" is used instead of super(), like in `Beta`
 
 Check out the `beta-inner` branch.
+
+3) I accidentally put this on beta-inner branch as well, whoops
+
+# Chapter 14
+
+1) Compress the line information for instructions
+
+As suggested in the text, I am doing a RLE of a sort.
+
+For line numbers, I store the line number, and the number of instructions it maps to. Then, I can iterate through
+by each line (it's linear based on how many lines are in the source file). I can then check to see if the offset would
+fall into the next lines block of instructions.  For example, if I had:
+
+Line 1, 4 instructions
+
+Line 2, 2 instructions
+
+Line 3, 6 instructions
+
+Let's say my offset is 7. I check if that would be less than 4 (instructions 0 -3), and if not, go on to the next line. The next line is
+instructions 4-5, which 7 is not less than, but the next line is instrcuctions 6-11, which is a hit, so I know I'm in line 3.
+
+
+2) Create a CONSTANT_LONG operation. What are some of the sacrifices
+
+See code
+
+We now have more opcodes, which I know some RISC enthusiasts may cringe at, especially for such a small edge case (after all, this is the sort of problem that 
+we decry for Intel assembly architectures). We also have to increase the code for anything that is consuming the bytecode.
+
+3) How does malloc and free work in regards to knowing the size, which bytes are allocated, and how do they deal with fragmentation. As 
+   a hard mode, write your reallocate with an arena.
+
+So I found this for malloc and free: https://sourceware.org/glibc/wiki/MallocInternals.
+
+I've also been reading TAOCP from Knuth where the first volume talks a ton about pool allocators
+
+So I think what I'm going to do is adopt Knuth's buddy system with a pool allocator. Essentially:
+
+* Reserve 1 gig of memory into an arena.
+* Set up linked lists for all sizes from 8 bytes to 1 gigabyte.
+* At first, there is one block is 1 gigabyte in size
+* Each block is a linked list with the first 4 being the next link in the list, next 4 being the previous link. The free block should have a 1 as the first bit.
+* Upon allocation, we will walk up the sizes until we find something that can fit the memory (keeping in mind we need 4 bytes for bookkeeping)
+* When we find a block that fits, we split it in half if needed, populating any below lists that fit the halves. The first bit will be come a zero for in use, and the next 31 bits is the power of 2 that is the size of the block (so we can have up to 2^127 with this scheme).
+* We'll write the number of bits in the first byte, reserving the rest of the block for the actual memory. 
+* When we free, we'll put the block on the front of the appropriate list, and look if it's corresponding other half is free (The first bit should be a 1). If it is, collapse it, put that block on its free store and repeat.
+
+
+You could get fragmentation if you allocate everything, and then piecemeal deallocate small blocks, but there's not much help avoiding that, since we don't want to be 
+moving blocks around. Since blocks are returned to the beginning of the list, the blocks that are freed will be the ones that were most recently used.
+
+Note that I'm not being clever and handling larger sizes, this is just to show that we can do something with an arena. A true implementaiton would deal
+with overcommitted memory, multiple arenas that are built on the fly, and so on.

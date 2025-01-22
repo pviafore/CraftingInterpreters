@@ -9,6 +9,7 @@
 namespace lox {
     enum class OpCode : uint8_t {
         Constant,
+        LongConstant,
         Return,
         Unknown
     };
@@ -32,6 +33,15 @@ namespace lox {
     private:
         uint8_t constantAddress;
     };
+    class LongConstant : public _Instruction {
+    public:
+        LongConstant(const std::byte* buffer) : _Instruction(OpCode::LongConstant, 4), address(toAddress(buffer + 1)) {}
+        uint32_t value() const;
+
+    private:
+        uint32_t address;
+        uint32_t toAddress(const std::byte* buffer);
+    };
     class Unknown : public _Instruction {
     public:
         Unknown(const std::byte* buffer) : _Instruction(OpCode{static_cast<uint8_t>(*buffer)}, 1) {}
@@ -47,7 +57,7 @@ namespace lox {
         Instruction(Instruction&& rhs) = default;
         Instruction& operator=(Instruction&& rhs) = default;
 
-        using InstVariant = std::variant<Return, Constant, Unknown>;
+        using InstVariant = std::variant<Constant, LongConstant, Return, Unknown>;
         InstVariant instruction() const;
         size_t offset() const;
         size_t size() const;
@@ -82,8 +92,9 @@ namespace lox {
         using iterator_type = InstructionIterator;
         void write(lox::OpCode value, size_t line);
         void write(uint8_t value, size_t line);
-        uint8_t addConstant(Value value);
-        Value getConstant(uint8_t index) const;
+        void write(std::byte value, size_t line);
+        void writeConstant(Value value, size_t line);
+        Value getConstant(size_t index) const;
 
         size_t getLineNumber(size_t offset) const;
 
@@ -93,7 +104,10 @@ namespace lox {
 
     private:
         Vector<std::byte> data;
-        Vector<size_t> lines;
+        // line number and count of instructions
+        // can't use pair because our allocator doesn't call constructors
+        // so we have two sixteen bit fields in our uint32_t
+        Vector<uint32_t> lines;
         Vector<Value> values;
     };
 }  // namespace lox

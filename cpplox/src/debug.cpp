@@ -17,7 +17,10 @@ namespace lox {
     }
 
     void constantInstruction(std::ostringstream& out, const Chunk& chunk, const lox::Constant& c) {
-        out << std::left << std::setw(16) << "OP_CONSTANT" << " " << std::setw(4) << c.value() << " " << chunk.getConstant(c.value());
+        out << std::left << std::setw(16) << "OP_CONSTANT" << " " << std::setw(4) << static_cast<size_t>(c.value()) << " " << chunk.getConstant(c.value()) << std::right;
+    }
+    void constantInstruction(std::ostringstream& out, const Chunk& chunk, const lox::LongConstant& c) {
+        out << std::left << std::setw(16) << "OP_LONGCONSTANT" << " " << std::setw(10) << c.value() << " " << chunk.getConstant(c.value()) << std::right;
     }
 
     void formatInstruction(std::ostringstream& out, const Chunk& chunk, const lox::Instruction& instruction) {
@@ -31,6 +34,7 @@ namespace lox {
         auto overloads = overload{
             [&out](Return&) { out << "OP_RETURN"; },
             [&out, &chunk, &instruction](Constant& c) { constantInstruction(out, chunk, c); },
+            [&out, &chunk, &instruction](LongConstant& c) { constantInstruction(out, chunk, c); },
             [&out](Unknown& u) { out << "Unknown Op Code" << std::to_underlying(u.opcode); },
         };
         std::visit(overloads, inst);

@@ -39,6 +39,12 @@ namespace lox {
             }
             return this->data[index];
         }
+        T& operator[](size_t index) {
+            if (index >= count) {
+                throw lox::Exception("Index out of bounds for constant access", nullptr);
+            }
+            return this->data[index];
+        }
 
         void clear() {
             reallocate(data, sizeof(T) * count, 0);
@@ -63,6 +69,7 @@ namespace lox {
                 size_t newCapacity = std::max(8uz, capacity * 2);
                 data =
                     (T*)reallocate(data, sizeof(T) * capacity, sizeof(T) * newCapacity);
+                capacity = newCapacity;
             }
 
             data[count++] = value;

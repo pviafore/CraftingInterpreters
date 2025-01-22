@@ -12,9 +12,10 @@ int main() {
         chunk.write(lox::OpCode{5}, 1);
         chunk.write(lox::OpCode::Return, 2);
 
-        auto index = chunk.addConstant(1.2);
-        chunk.write(lox::OpCode::Constant, 3);
-        chunk.write(index, 3);
+        chunk.writeConstant(1.2, 3);
+        for (int i = 4; i < 300; ++i) {
+            chunk.writeConstant(2, i);
+        }
 
         lox::printChunk(chunk, "test chunk");
     } catch (lox::BadAllocException e) {
