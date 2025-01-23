@@ -12,9 +12,9 @@ int main() {
         chunk.write(lox::OpCode{5}, 1);
         chunk.write(lox::OpCode::Return, 2);
 
-        chunk.writeConstant(1.2, 3);
-        for (int i = 4; i < 300; ++i) {
-            chunk.writeConstant(2, i);
+        for (size_t i = 0; i < 150; ++i) {
+            chunk.writeConstant(1.2, i + 3);
+            chunk.writeConstant(2, i + 3);
         }
 
         lox::printChunk(chunk, "test chunk");

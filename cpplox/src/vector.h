@@ -35,13 +35,13 @@ namespace lox {
 
         T operator[](size_t index) const {
             if (index >= count) {
-                throw lox::Exception("Index out of bounds for constant access", nullptr);
+                throw lox::Exception("Index out of bounds for vector access", nullptr);
             }
             return this->data[index];
         }
         T& operator[](size_t index) {
             if (index >= count) {
-                throw lox::Exception("Index out of bounds for constant access", nullptr);
+                throw lox::Exception("Index out of bounds for vector access", nullptr);
             }
             return this->data[index];
         }

@@ -20,7 +20,7 @@ namespace lox {
         out << std::left << std::setw(16) << "OP_CONSTANT" << " " << std::setw(4) << static_cast<size_t>(c.value()) << " " << chunk.getConstant(c.value()) << std::right;
     }
     void constantInstruction(std::ostringstream& out, const Chunk& chunk, const lox::LongConstant& c) {
-        out << std::left << std::setw(16) << "OP_LONGCONSTANT" << " " << std::setw(10) << c.value() << " " << chunk.getConstant(c.value()) << std::right;
+        out << std::left << std::setw(16) << "OP_LONGCONSTANT" << " " << std::setw(4) << c.value() << " " << chunk.getConstant(c.value()) << std::right;
     }
 
     void formatInstruction(std::ostringstream& out, const Chunk& chunk, const lox::Instruction& instruction) {
