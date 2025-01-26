@@ -1,5 +1,7 @@
 #ifndef CPPLOX_CHUNK_H_
 #define CPPLOX_CHUNK_H_
+#include <functional>
+#include <string>
 #include <utility>
 #include <variant>
 
@@ -8,26 +10,28 @@
 #include "vector.h"
 namespace lox {
     enum class OpCode : uint8_t {
+        Add,
         Constant,
+        Divide,
         LongConstant,
+        Multiply,
+        Negate,
         Return,
+        Subtract,
         Unknown
     };
 
     struct _Instruction {
     public:
-        _Instruction(OpCode opcode, size_t size) : opcode(opcode), size(size) {}
+        _Instruction(OpCode opcode, size_t size, std::string name) : opcode(opcode), size(size), name(std::move(name)) {}
         OpCode opcode;
         size_t size = 1;
+        std::string name;
     };
 
-    class Return : public _Instruction {
-    public:
-        Return() : _Instruction(OpCode::Return, 1) {}
-    };
     class Constant : public _Instruction {
     public:
-        Constant(const std::byte* buffer) : _Instruction(OpCode::Constant, 2), constantAddress(static_cast<uint8_t>(*(buffer + 1))) {}
+        Constant(const std::byte* buffer) : _Instruction(OpCode::Constant, 2, "OP_CONSTANT"), constantAddress(static_cast<uint8_t>(*(buffer + 1))) {}
         uint8_t value() const;
 
     private:
@@ -35,16 +39,64 @@ namespace lox {
     };
     class LongConstant : public _Instruction {
     public:
-        LongConstant(const std::byte* buffer) : _Instruction(OpCode::LongConstant, 4), address(toAddress(buffer + 1)) {}
+        LongConstant(const std::byte* buffer) : _Instruction(OpCode::LongConstant, 4, "OP_LONG_CONSTANT"), address(toAddress(buffer + 1)) {}
         uint32_t value() const;
 
     private:
         uint32_t address;
         uint32_t toAddress(const std::byte* buffer);
     };
+    class Negate : public _Instruction {
+    public:
+        Negate() : _Instruction(OpCode::Negate, 1, "OP_NEGATE") {}
+    };
+    class Return : public _Instruction {
+    public:
+        Return() : _Instruction(OpCode::Return, 1, "OP_RETURN") {}
+    };
     class Unknown : public _Instruction {
     public:
-        Unknown(const std::byte* buffer) : _Instruction(OpCode{static_cast<uint8_t>(*buffer)}, 1) {}
+        Unknown(const std::byte* buffer) : _Instruction(OpCode{static_cast<uint8_t>(*buffer)}, 1, "OP_UNKNOWN: " + std::to_string(static_cast<uint32_t>(*buffer))) {}
+    };
+    inline std::string toBinaryName(std::byte opcodeByte) {
+        OpCode opcode{static_cast<uint8_t>(opcodeByte)};
+        switch (opcode) {
+        case OpCode::Add:
+            return "OP_ADD";
+        case OpCode::Subtract:
+            return "OP_SUBTRACT";
+        case OpCode::Multiply:
+            return "OP_MULTIPLY";
+        case OpCode::Divide:
+            return "OP_DIVIDE";
+        default:
+            return "Unknown Binary Op";
+        }
+    }
+
+    inline std::function<Value(Value, Value)> toBinaryOp(std::byte opcodeByte) {
+        OpCode opcode{static_cast<uint8_t>(opcodeByte)};
+        switch (opcode) {
+        case OpCode::Add:
+            return std::plus<Value>();
+        case OpCode::Subtract:
+            return std::minus<Value>();
+        case OpCode::Multiply:
+            return std::multiplies<Value>();
+        case OpCode::Divide:
+            return std::divides<Value>();
+        default:
+            throw lox::Exception("Unknown binary operation", nullptr);
+        }
+    }
+    class Binary : public _Instruction {
+    public:
+        using Op = std::function<Value(Value, Value)>;
+        Binary(const std::byte* buffer) : _Instruction(OpCode{static_cast<uint8_t>(*buffer)}, 1, toBinaryName(*buffer)), op(toBinaryOp(*buffer)) {}
+        Op getOp() const { return op; }
+
+    private:
+        std::function<Value(Value, Value)> op;
     };
 
     class Instruction {
@@ -57,7 +109,7 @@ namespace lox {
         Instruction(Instruction&& rhs) = default;
         Instruction& operator=(Instruction&& rhs) = default;
 
-        using InstVariant = std::variant<Constant, LongConstant, Return, Unknown>;
+        using InstVariant = std::variant<Binary, Constant, LongConstant, Negate, Return, Unknown>;
         InstVariant instruction() const;
         size_t offset() const;
         size_t size() const;
@@ -77,6 +129,9 @@ namespace lox {
 
             // Increment operator (prefix)
             InstructionIterator& operator++();
+
+            // Increment operator (postfix)
+            InstructionIterator operator++(int);
 
             // Inequality operator
             bool operator!=(const InstructionIterator& other) const;

@@ -8,6 +8,7 @@
 
 namespace lox {
     void printChunk(const lox::Chunk& chunk, std::string_view name);
+    void disassembleInstruction(const lox::Chunk& chunk, const lox::Instruction& instruction);
     void formatInstruction(std::ostringstream& out, const lox::Chunk& chunk, const lox::Instruction& instruction);
 }
 template <>

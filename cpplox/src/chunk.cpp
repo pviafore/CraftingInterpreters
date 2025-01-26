@@ -11,10 +11,17 @@ namespace lox {
     Instruction::InstVariant makeInstruction(const std::byte* buffer) {
         OpCode code = OpCode{static_cast<uint8_t>(*(buffer))};
         switch (code) {
+        case OpCode::Add:
+        case OpCode::Divide:
+        case OpCode::Multiply:
+        case OpCode::Subtract:
+            return Binary(buffer);
         case OpCode::Constant:
             return Constant(buffer);
         case OpCode::LongConstant:
             return LongConstant(buffer);
+        case OpCode::Negate:
+            return Negate{};
         case OpCode::Return:
             return Return{};
         default:
@@ -64,6 +71,13 @@ namespace lox {
         offset += instruction.size();
         parsed = false;
         return *this;
+    }
+
+    // Increment operator (prefix)
+    Chunk::InstructionIterator Chunk::InstructionIterator::operator++(int) {
+        InstructionIterator tmp = *this;
+        ++(*this);
+        return tmp;
     }
 
     // Inequality operator

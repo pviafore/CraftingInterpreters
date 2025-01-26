@@ -5,17 +5,23 @@
 #include "common.h"
 #include "debug.h"
 #include "loxexception.h"
+#include "vm.h"
 int main() {
     try {
         lox::Chunk chunk;
-        chunk.write(lox::OpCode::Return, 1);
-        chunk.write(lox::OpCode{5}, 1);
-        chunk.write(lox::OpCode::Return, 2);
 
-        for (size_t i = 0; i < 150; ++i) {
-            chunk.writeConstant(1.2, i + 3);
-            chunk.writeConstant(2, i + 3);
-        }
+        chunk.writeConstant(1.2, 1);
+        chunk.writeConstant(3.4, 1);
+        chunk.write(lox::OpCode::Add, 1);
+
+        chunk.writeConstant(5.6, 2);
+        chunk.write(lox::OpCode::Multiply, 2);
+        chunk.write(lox::OpCode::Negate, 3);
+        chunk.write(lox::OpCode::Return, 3);
+
+        lox::VM vm;
+        vm.diagnosticMode = true;
+        vm.interpret(chunk);
 
         lox::printChunk(chunk, "test chunk");
     } catch (lox::BadAllocException e) {

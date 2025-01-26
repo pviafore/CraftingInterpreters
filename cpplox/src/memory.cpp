@@ -74,6 +74,18 @@ namespace lox {
         return poolSizes[index + 3] - 1;  // take off 1 byte for the size that has to go in the first byte
     }
 
+    // can't use endianess because we want our msb in the first byte
+    void writeIntToMemory(std::byte* memory, uint32_t value) {
+        memory[0] = std::byte{static_cast<uint8_t>((value >> 24) & 0xFF)};
+        memory[1] = std::byte{static_cast<uint8_t>((value >> 16) & 0xFF)};
+        memory[2] = std::byte{static_cast<uint8_t>((value >> 8) & 0xFF)};
+        memory[3] = std::byte{static_cast<uint8_t>(value & 0xFF)};
+    }
+
+    uint32_t readIntFromMemory(std::byte* memory) {
+        return (static_cast<uint8_t>(memory[0]) << 24) + (static_cast<uint8_t>(memory[1]) << 16) + (static_cast<uint8_t>(memory[2]) << 8) + static_cast<uint8_t>(memory[3]);
+    }
+
     Arena arena;
 
     Arena::Arena() {
@@ -170,11 +182,17 @@ namespace lox {
         }
         // if we have a target index that we can grow to
         if (targetIndex < 27 && isFree(buddy)) {
+            auto leftmostFreeBlock = block;
             for (size_t index = poolIndex; index <= targetIndex; ++index) {
                 auto buddy = getBuddy(index, block);
+                leftmostFreeBlock = std::min(buddy, leftmostFreeBlock);
                 removeBlockFromPool(buddy);
             }
+            if (leftmostFreeBlock < block) {
+                memcpy(leftmostFreeBlock + 1, block + 1, poolSize);
+            }
             // write new size in the block
+            block = leftmostFreeBlock;
             *block = std::byte{static_cast<uint8_t>(targetIndex + 1)};
             return block;
         }
@@ -214,15 +232,16 @@ namespace lox {
     // if needed (this is becasue sometimes a block is removed and added to a bigger block)
     // which does not need its own size tracking
     void Arena::removeBlockFromPool(std::byte* block) {
-        auto previousIndex = *reinterpret_cast<uint32_t*>(block);
-        auto nextIndex = *reinterpret_cast<uint32_t*>(block + 4);
+        auto previousIndex = readIntFromMemory(block) & 0x7FFFFFFF;
+        auto nextIndex = readIntFromMemory(block + 4);
         if (previousIndex != POOL_SENTINEL) {
             auto previousBlock = memory + previousIndex;
-            memcpy(previousBlock + 4, &nextIndex, 4);
+            writeIntToMemory(previousBlock + 4, nextIndex);
         }
         if (nextIndex != POOL_SENTINEL) {
             auto nextBlock = memory + previousIndex;
-            memcpy(nextBlock, &previousIndex, 4);
+            writeIntToMemory(nextBlock, previousIndex);
+            nextBlock[0] |= std::byte{1 << 7};  // restore free bit
         }
         for (auto& pool : pools) {
             if (memory + pool == block) {
@@ -234,15 +253,8 @@ namespace lox {
     std::byte* Arena::popBlockFromPool(size_t poolIndex) {
         auto poolOffset = pools[poolIndex];
         auto block = memory + poolOffset;
+        removeBlockFromPool(block);
         block[0] = std::byte{static_cast<uint8_t>(poolIndex)};  // clear free bit and set size so we know how to free it later
-        auto nextBlockOffset = *(reinterpret_cast<uint32_t*>(block + 4));
-        if (nextBlockOffset != POOL_SENTINEL) {
-            auto nextBlock = memory + nextBlockOffset;
-            memcpy(nextBlock, &POOL_SENTINEL, sizeof(uint32_t));  // set previous block
-            nextBlock[0] |= std::byte{1 << 7};                    // restore free bit
-        }
-
-        pools[poolIndex] = nextBlockOffset;
         return block;
     }
 
@@ -253,13 +265,14 @@ namespace lox {
     void Arena::addToFreePool(size_t poolIndex, std::byte* block) {
         uint32_t firstBlockOffset = pools[poolIndex];
         uint32_t newBlockOffset = static_cast<uint32_t>(block - memory);
-        memcpy(block + 4, &firstBlockOffset, sizeof(uint32_t));
         if (firstBlockOffset != POOL_SENTINEL) {
             std::byte* firstBlock = memory + firstBlockOffset;
-            memcpy(firstBlock, &newBlockOffset, 4);
+            writeIntToMemory(firstBlock, newBlockOffset);
             firstBlock[0] |= std::byte{1 << 7};  // restore free bit
         }
-        block[0] = std::byte{1 << 7};  // no previous link, but mark as free
+        writeIntToMemory(block, POOL_SENTINEL);
+        writeIntToMemory(block + 4, firstBlockOffset);
+        block[0] |= std::byte{1 << 7};  // no previous link, but mark as free
         pools[poolIndex] = newBlockOffset;
     }
 }

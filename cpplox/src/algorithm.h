@@ -1,5 +1,7 @@
 #include <cstddef>
+#include <functional>
 
+#include "loxexception.h"
 #include "utility.h"
 namespace lox {
 
@@ -64,12 +66,59 @@ namespace lox {
             EnumerateIterator _end;
         };
 
+        template <range Range, typename F>
+        class transform {
+        public:
+            using ReturnType = std::invoke_result_t<F, typename Range::value_type>;
+            using value_type = ReturnType;
+            class TransformIterator {
+            public:
+                TransformIterator(const Range::value_type* iter, std::function<ReturnType(typename Range::value_type)> f) : iter(iter), f(f) {}
+
+                ReturnType operator*() const {
+                    return f(*iter);
+                }
+
+                TransformIterator& operator++() {
+                    iter++;
+                    return *this;
+                }
+
+                bool operator!=(const TransformIterator& rhs) const {
+                    return iter != rhs.iter;
+                }
+
+            private:
+                const Range::value_type* iter;
+                std::function<ReturnType(typename Range::value_type)> f;
+            };
+            transform(const Range& r, F f) : r(r), f(f) {}
+            auto begin() const {
+                return TransformIterator(r.begin(), f);
+            }
+            auto end() const {
+                return TransformIterator(r.end(), f);
+            }
+
+        private:
+            const Range& r;
+            std::function<ReturnType(typename Range::value_type)> f;
+        };
+
     }
     namespace ranges {
         template <range Range>
         void fill(Range& r, typename Range::value_type v) {
             for (auto& e : r) {
                 e = v;
+            }
+        }
+
+        template <range Range1, typename Iterator>
+        void copy(Range1& r1, Iterator r2) {
+            for (const auto& e : r1) {
+                *r2 = e;
+                ++r2;
             }
         }
     }
