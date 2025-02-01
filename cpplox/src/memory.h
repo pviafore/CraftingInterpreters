@@ -40,7 +40,7 @@ namespace lox {
     template <typename T>
     T* reallocate(T* pointer, size_t oldSize, size_t newSize) {
         T* result = nullptr;
-        if (oldSize == 0 && newSize != 0) {
+        if (pointer == nullptr || (oldSize == 0 && newSize != 0)) {
             result = reinterpret_cast<T*>(arena.allocate(newSize));
         } else if (newSize == 0 && oldSize != 0) {
             arena.deallocate(pointer);
@@ -51,6 +51,12 @@ namespace lox {
         if (!result)
             throw BadAllocException{"Memory realloc failed", std::bad_alloc{}};
         return result;
+    }
+
+    template <typename T>
+    T* allocate(size_t size) {
+        T* pointer;
+        return reallocate(pointer, 0, size);
     }
 
 }

@@ -397,3 +397,133 @@ moving blocks around. Since blocks are returned to the beginning of the list, th
 
 Note that I'm not being clever and handling larger sizes, this is just to show that we can do something with an arena. A true implementaiton would deal
 with overcommitted memory, multiple arenas that are built on the fly, and so on.
+
+# Chapter 15
+
+1) Write teh bytecode instruction sequences for the follwoing:
+
+1 + 2 + 3
+
+* Constant 1
+* Cosntant 2 
+* Op Add
+* Constant 3
+* Op Add
+
+
+1+2*3
+
+* Constant 1
+* Constant 2
+* Constant 3
+* Op Multiply
+* Op add
+
+3 - 2 - 1
+
+* Constant 3
+* Constant 2
+* Op Subtract
+* Constant 1
+* Op Subtract
+
+1 + 2 * 3 - 4 / - 5
+
+* Constant 1
+* Constant 2
+* Constant 3
+* Op Multiply
+* Op Add
+* Constant 4
+* Constnat 5
+* Negate
+* Op Divide
+* Op Subtract
+
+
+2) Write the following without negate and without subtract. What are the trade-offs and are there other redundant instructions?
+
+
+4 - 3 * -2
+
+Without negate: 
+
+* Constant 4
+* Constnat 0
+* Constant 3
+* Constant 2
+* Multiply
+* Op Subtract
+* Op Subtract
+
+
+Wihtout subtraction
+
+* Constant 4
+* Constant 3
+* Constant 2
+* Op Negate
+* Op Divide
+* Op Negate
+* Op Add
+
+
+I like having both instructions, because while I think it does complicate for an implementer, it reduces the bytecode size, which will speed things up.
+
+If it's something the user can directly do (like a negate, or a subtraction), it will also help with debugging the disassembly.
+
+
+As far as redundancy, you don't need subtract if you have add, and you don't need multiply if you have a divide
+
+3) Our VM stack has a fixed size, make it dynamic. What are the costs and benefits of it?
+
+See the code to see a vector growing and shrinking the stack. This does add runtime cost, as we have to do memory management with a vector.
+With a fixed stack, you have a few instrudtions to move the stack pointer, and no allocs needed. However, you can run into stack overflows if you
+keep a static stack.
+
+
+See the code where we use `DynamicStack`
+
+4) Is there a big performance difference by eliding a pop when a push is going to come right after it? 
+
+I'm not sure I'm going to measure enough of a difference, but it is going to be very small (it will be less instructions. I don't
+feel like setting up benchmarking at this time to deal with this.) I'm altering the instructions to see their work.
+
+# Chapter 16
+
+1) What token types would you use for string interpolation and what would you emit for string interpolations?
+
+So Python handles nested interpolations. At it's core, it feels like you have strings, that then terminate before you hit ${}. So for
+something like "Hello ${name}", you would need to look for a $". You'd terminate the string at "Hello ", which is a string token, and then have
+an interpolate token `${`. The closing brace would still be a `RIGHT_BRACE`. When you get to a parsing stage, you would evaluate all the tokens as an expression
+between Interpolate and RightBrace. You would also need to start another string token after the right brace. You'd also want to implicitly converte the expression
+to a string. You would also need implicit add operators between the string and interpolation and add operations between interpolation and next string.
+
+2) How do langugaes differentiate between nested generics `vector<vector<int>>` and right shift `>>`. 
+
+My guess is precedence checking and making things not context-free. Let's go check it out:
+
+So in C++, they stopped looking at >> as a single token, and instead treated > as a single token. This way, when you were parsing template lists, 
+you would be able to figure out which > delimites the token.
+
+Java looks at context and if its in the context of a type, a > is always treated as a single character rather than being greedy as it is everywhere else.
+
+C# does not treat `>>` as a separate token.
+
+3) What are some contextual keywords from other languages? What are pros and cons of having contextual keywords. How would you implement them in the front-end.
+
+Python has match, case, and type. Match and case are part of the new match operator.
+
+C++ has coroutine contextual keywords (co_yield, co_return), and method specifiers (override, final).
+
+This is nice because it gives you backwards compatibility - older programs will continue to compile. You won't run into scanning bugs because 
+you aren't treating these any different, they are still just identifiers. However, it will make a language implementer's job much tougher. You now
+have to do so much more for contextual awareness to know if you should be using an identifier or keyword. It also adds more contextual overhead for
+developers because there are more rules to understand.
+
+I would scan them as identifiers, and then in parse state, before any identifier that may be used in that context, you have to check if it's useful. (For example, 
+if you were reading a function, you may look for identifiers in C++ after the parameter list, and see if they match override or final. )
+
+
+# Chapter 17
+

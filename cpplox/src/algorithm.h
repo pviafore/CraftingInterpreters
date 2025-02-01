@@ -1,3 +1,5 @@
+#ifndef LOXCPP_ALGORITHM_H_
+#define LOXCPP_ALGORITHM_H_
 #include <cstddef>
 #include <functional>
 
@@ -113,6 +115,13 @@ namespace lox {
                 e = v;
             }
         }
+        template <typename Iterator>
+        void fill_n(Iterator it, size_t count, typename Iterator::value_type value) {
+            for (size_t i = 0; i <= count; ++i) {
+                *it = value;
+                it++;
+            }
+        }
 
         template <range Range1, typename Iterator>
         void copy(Range1& r1, Iterator r2) {
@@ -123,3 +132,4 @@ namespace lox {
         }
     }
 }
+#endif
