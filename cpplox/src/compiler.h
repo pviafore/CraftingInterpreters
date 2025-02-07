@@ -12,6 +12,7 @@ namespace lox {
     enum class Precedence {
         None,
         Assignment,
+        Ternary,
         Or,
         And,
         Equality,
@@ -46,6 +47,7 @@ namespace lox {
         void grouping();
         void unary();
         void binary();
+        void ternary();
         size_t previousLine() const;
         void parsePrecedence(Precedence precedence);
         const ParseRule& getRule(TokenType type) const;

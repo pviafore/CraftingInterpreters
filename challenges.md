@@ -527,3 +527,41 @@ if you were reading a function, you may look for identifiers in C++ after the pa
 
 # Chapter 17
 
+1) Write out the trace for (-1 + 2) * 3 - -4
+
+* expression() gets called
+* parsePrecedence(Assignment) is called
+* A left parens is seen, which means we call the prefix (grouping)
+* Grouping recurses into expression()
+* parsePrecedence(Assignment) is called
+* `-` is read in, which means we call the prefix unary
+* We parsePrecedence(unary), which will find a number
+* We parse the 1, emit the constant
+* After doing the prefix for number, we check for any higher precedence for infix rules. Since Unary is higher than term, we don't parse it.
+* We finish the call to unary and emit negate instruction
+* We unroll to our parse precedence(assignment) which first read the unary, and now we are looking at infix operators. Since we were at assignment, we are able to 
+  find the + sign as a valid invix operator, and call binary.
+* Binary finds the + sign, and then parsePrecedence for Term. Since the next token is a number, we call number() and emit that.
+* We then look at infix operators, which our next token is ). That is precedence nothing, so we just return back up to the binary expression.
+* We then finish binary, emitting the operator that we saw.
+* We will keep unrolling at the ) until we finish out our grouping() call, consuming the right parentheses.
+* At this point, we have finished grouping as part of our first parsePrecedence, and we look for infix operators
+* We find a * (this is a Factor, which is higher than Assignment), so we go into binary
+* Binary will call parsePredence on Factor, which will find primary of 3, and emit that. No infix operator is higher than primary, so no further calls
+* to parsePrecedence or matching rules are found
+* We finish binary() and emit a *
+* We advance to the next token for infixes higher than assignment (we're back at the first parsePrecedence again), and we find a -
+* Same deal for binary, first we check the rest of the expression first with a parsePrecedence Term
+* An unary is found (the - in -4), so we save off that, and call parsePrecedence on Unary. This finds 4 which is then emitted.
+* Unary is finished, so we emit the negate operation
+* Binary is finished, so we emit the subtraction operation
+* parsePrecedence for assignment is finished, and there are no more tokens.
+
+2) In the full Lox language, what operators are both infix and prefix? What about in C
+
+In Lox, - was already mentioned, and all I can find otherwise is the < token, as it signals inheritance as well as less than. In something like C, I know we have * (pointer dereference and multiplication). & Is in C++ (reference vs bitwise and ). That's all I can think of right now (pehraps / as comment vs division?)
+
+3)  How would a mixfix operator work, like ternary?
+
+I would treat the ternary as an infix on the ? symbol. We know we would have already parsed an expression (Which would put a bool on the stack, presumably). Then, we parse the infix operation (should be higher than assignment, but before or/and). We could then parse an expression, and then consume the :. We would then parse the following expression (hopefully it is handled by parens to give a grouping). I don't know how to do the jumps yet, but it doesn't seem so bad.
+

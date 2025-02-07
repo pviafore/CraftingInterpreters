@@ -69,6 +69,8 @@ namespace lox {
             return makeToken(TokenType::RightBrace);
         case ';':
             return makeToken(TokenType::Semicolon);
+        case ':':
+            return makeToken(TokenType::Colon);
         case ',':
             return makeToken(TokenType::Comma);
         case '.':
@@ -77,6 +79,8 @@ namespace lox {
             return makeToken(TokenType::Minus);
         case '+':
             return makeToken(TokenType::Plus);
+        case '?':
+            return makeToken(TokenType::Question);
         case '/':
             return makeToken(TokenType::Slash);
         case '*':

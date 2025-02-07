@@ -102,6 +102,13 @@ namespace lox {
         }
     }
 
+    void Compiler::ternary() {
+        expression();
+        parser.consume(TokenType::Colon, "Expected colon between ternary expressions");
+        expression();
+        // this will emit the code for expressions, but what do we do to jump between them?
+    }
+
     const Compiler::ParseRule& Compiler::getRule(TokenType type) const {
         const static ParseRule empty{};
         const static std::unordered_map<TokenType, ParseRule> rules{
@@ -111,7 +118,7 @@ namespace lox {
             {TokenType::Slash, {{}, &Compiler::binary, Precedence::Factor}},
             {TokenType::Star, {{}, &Compiler::binary, Precedence::Factor}},
             {TokenType::Number, {&Compiler::number}},
-        };
+            {TokenType::Question, {{}, &Compiler::ternary, Precedence::Ternary}}};
 
         auto iter = rules.find(type);
         return iter == rules.end() ? empty : iter->second;
