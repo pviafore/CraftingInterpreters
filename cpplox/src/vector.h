@@ -14,19 +14,24 @@ namespace lox {
         using value_type = T;
         Vector() {}
 
-        ~Vector() { reallocate(data, sizeof(T) * capacity, 0); }
+        ~Vector() {
+            if (capacity) {
+                reallocate(data, sizeof(T) * capacity, 0);
+            }
+        }
 
         Vector(const Vector& rhs) {
             data = reallocate(data, 0, sizeof(T) * rhs.capacity);
-            memcpy(data, rhs.data, rhs.count);
+            memcpy(data, rhs.data, rhs.count * sizeof(T));
             capacity = rhs.capacity;
             count = rhs.count;
         };
         Vector& operator=(const Vector& rhs) {
-            data = reallocate(data, 0, sizeof(T) * rhs.capacity);
-            memcpy(data, rhs.data, rhs.count);
+            data = reallocate(data, sizeof(T) * capacity, sizeof(T) * rhs.capacity);
+            memcpy(data, rhs.data, rhs.count * sizeof(T));
             capacity = rhs.capacity;
             count = rhs.count;
+            return *this;
         }
 
         Vector(Vector&& rhs) {
@@ -116,7 +121,7 @@ namespace lox {
                     (T*)reallocate(data, sizeof(T) * capacity, sizeof(T) * newCapacity);
                 capacity = newCapacity;
             }
-            memcpy(data + count, begin, requestedSize);
+            memcpy(data + count, begin, requestedSize * sizeof(T));
             count += requestedSize;
         }
 

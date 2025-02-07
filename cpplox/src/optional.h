@@ -8,18 +8,19 @@ namespace lox {
     class Optional {
     public:
         Optional() : _hasValue(false) {
-            _value.n = Nullopt{};
         }
 
         Optional(T t) : _hasValue(true) {
-            _value.t = t;
+            _value = t;
         }
+
+        ~Optional() {}
 
         T value() const {
             if (!_hasValue) {
                 throw lox::Exception("Bad optional access", nullptr);
             }
-            return _value.t;
+            return _value;
         }
 
         operator bool() const {
@@ -31,11 +32,7 @@ namespace lox {
         }
 
     private:
-        union Value {
-            Nullopt n;
-            T t;
-        };
-        Value _value;
+        T _value;
 
         bool _hasValue = false;
     };

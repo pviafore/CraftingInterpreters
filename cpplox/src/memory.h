@@ -26,6 +26,7 @@ namespace lox {
         bool isFree(std::byte* block) const;
         void removeBlockFromPool(std::byte* block);
         void verifyNotFreed(std::byte* block) const;
+        void verifyFreed(std::byte* block) const;
         void verifyAllocatedBlockHasValidPoolSize(std::byte* block) const;
         std::byte* growBlock(std::byte* block, size_t poolIndex, size_t newSize);
         std::byte* shrinkBlock(std::byte* block, size_t poolIndex, size_t newSize);

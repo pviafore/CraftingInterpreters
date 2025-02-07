@@ -11,15 +11,17 @@
 #include "vm.h"
 
 static void repl(lox::VM& vm) {
-    lox::String s;
     while (true) {
+        lox::String s;
         std::print("> ");
         std::cin >> s;
-        if (s.empty()) {
+        if (std::cin.eof()) {
             std::println();
             break;
         }
-        vm.interpret(s);
+        if (!s.empty()) {
+            vm.interpret(s);
+        }
     }
 }
 

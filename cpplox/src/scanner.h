@@ -71,6 +71,7 @@ namespace lox {
         friend bool operator!=(const TokenIterator& ti1, const TokenIterator& ti2) {
             return ti1.ptr != ti2.ptr;
         }
+        Token* operator->();
 
     private:
         void parseToken();

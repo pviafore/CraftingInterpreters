@@ -1,5 +1,6 @@
 #ifndef LOXCPP_STRING_H_
 #define LOXCPP_STRING_H_
+#include <cassert>
 #include <cstring>
 #include <format>
 
@@ -61,6 +62,8 @@ namespace lox {
                 size_t length = strlen(chars);
                 s.buffer.push_back(chars, chars + length);
             }
+            in.clear();
+            in.ignore();
             return in;
         }
 
@@ -104,7 +107,7 @@ namespace lox {
 template <>
 struct std::formatter<lox::String, char> {
     constexpr auto parse(auto& ctx) { return ctx.begin(); }
-    auto format(lox::String& s, auto& ctx) const {
+    auto format(const lox::String& s, auto& ctx) const {
         lox::ranges::copy(s.buffer, ctx.out());
         return ctx.out();
     }

@@ -115,8 +115,9 @@ namespace lox {
                 e = v;
             }
         }
-        template <typename Iterator>
-        void fill_n(Iterator it, size_t count, typename Iterator::value_type value) {
+
+        template <typename Iterator, typename T>
+        void fill_n(Iterator it, size_t count, T value) {
             for (size_t i = 0; i <= count; ++i) {
                 *it = value;
                 it++;

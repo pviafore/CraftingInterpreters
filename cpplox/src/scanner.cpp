@@ -31,6 +31,12 @@ namespace lox {
         parseToken();
         return *this;
     }
+    Token* TokenIterator::operator->() {
+        if (!parsed) {
+            parseToken();
+        }
+        return &token;
+    }
 
     void TokenIterator::parseToken() {
         skipWhitespace();

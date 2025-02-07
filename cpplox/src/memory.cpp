@@ -1,6 +1,7 @@
 #include "memory.h"
 
 #include <cstring>
+#include <print>
 
 #include "algorithm.h"
 #include "loxexception.h"
@@ -91,6 +92,7 @@ namespace lox {
     Arena::Arena() {
         lox::ranges::fill(pools, POOL_SENTINEL);
         memory = (std::byte*)malloc(_1GB);
+        // lox::ranges::fill_n(memory, _1GB, std::byte{128});  // mark all as free
         if (!memory) {
             throw Exception("Could not allocate arena", nullptr);
         }
@@ -126,6 +128,11 @@ namespace lox {
             throw lox::Exception("Trying to free block that has already been freed", nullptr);
         }
     }
+    void Arena::verifyFreed(std::byte* block) const {
+        if (!isFree(block)) {
+            throw lox::Exception("Block is not a free block", nullptr);
+        }
+    }
     void Arena::verifyAllocatedBlockHasValidPoolSize(std::byte* block) const {
         if (static_cast<uint8_t>(*block) >= 28) {
             throw lox::Exception("We've detected some sort of corruption and can't deallocate this block", nullptr);
@@ -138,13 +145,15 @@ namespace lox {
         verifyAllocatedBlockHasValidPoolSize(blockStart);
         auto poolIndex = static_cast<size_t>(*blockStart);
         // while we have a buddy, combine it and move it up the pool
+        auto leftMostBlock = blockStart;
         auto buddy = getBuddy(poolIndex, blockStart);
         while (poolIndex < 27 && isFree(buddy)) {
             removeBlockFromPool(buddy);
             poolIndex++;
-            buddy = getBuddy(poolIndex, blockStart);
+            leftMostBlock = std::min(leftMostBlock, buddy);
+            buddy = getBuddy(poolIndex, leftMostBlock);
         }
-        addToFreePool(poolIndex, blockStart);
+        addToFreePool(poolIndex, leftMostBlock);
     }
 
     void* Arena::reallocate(void* rawBlock, size_t newSize) {
@@ -232,6 +241,7 @@ namespace lox {
     // if needed (this is becasue sometimes a block is removed and added to a bigger block)
     // which does not need its own size tracking
     void Arena::removeBlockFromPool(std::byte* block) {
+        verifyFreed(block);
         auto previousIndex = readIntFromMemory(block) & 0x7FFFFFFF;
         auto nextIndex = readIntFromMemory(block + 4);
         if (previousIndex != POOL_SENTINEL) {

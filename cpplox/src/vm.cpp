@@ -17,9 +17,13 @@ overload(Ts...) -> overload<Ts...>;
 namespace lox {
 
     InterpretResult VM::interpret(const String& s) {
-        Compiler compiler;
-        compiler.compile(s);
-        return InterpretResult::Ok;
+        Compiler compiler(s);
+        compiler.debugMode = true;
+        auto chunk = compiler.compile();
+        if (!chunk) {
+            return InterpretResult::CompileError;
+        }
+        return run(chunk.value());
     }
 
     InterpretResult VM::run(const Chunk& chunk) {
