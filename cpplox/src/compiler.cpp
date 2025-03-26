@@ -44,7 +44,8 @@ namespace lox {
 
     void Compiler::emitConstant(Value value) {
         try {
-            getCurrentChunk().writeConstant(value, previousLine());
+            auto num = std::get<double>(value);
+            getCurrentChunk().writeConstant(num, previousLine());
         } catch (lox::Exception& e) {
             parser.errorAtPrevious(e.what().c_str());
         }
@@ -68,6 +69,9 @@ namespace lox {
 
         parsePrecedence(Precedence::Unary);
         switch (previous.type) {
+        case TokenType::Bang:
+            emit(OpCode::Not);
+            break;
         case TokenType::Minus:
             emit(OpCode::Negate);
             break;
@@ -85,6 +89,27 @@ namespace lox {
         auto rule = getRule(operatorType);
         parsePrecedence(nextPrecedence(rule.precedence));
         switch (operatorType) {
+        case TokenType::BangEqual:
+            emit(OpCode::Equal);
+            emit(OpCode::Not);
+            break;
+        case TokenType::EqualEqual:
+            emit(OpCode::Equal);
+            break;
+        case TokenType::Greater:
+            emit(OpCode::Greater);
+            break;
+        case TokenType::GreaterEqual:
+            emit(OpCode::Less);
+            emit(OpCode::Not);
+            break;
+        case TokenType::Less:
+            emit(OpCode::Less);
+            break;
+        case TokenType::LessEqual:
+            emit(OpCode::Greater);
+            emit(OpCode::Not);
+            break;
         case TokenType::Plus:
             emit(OpCode::Add);
             break;
@@ -109,6 +134,23 @@ namespace lox {
         // this will emit the code for expressions, but what do we do to jump between them?
     }
 
+    void Compiler::literal() {
+        switch (parser.getPreviousToken().type) {
+        case TokenType::False:
+            emit(OpCode::False);
+            break;
+        case TokenType::True:
+            emit(OpCode::True);
+            break;
+        case TokenType::Nil:
+            emit(OpCode::Nil);
+            break;
+        default:
+            std::unreachable();
+            break;
+        }
+    }
+
     const Compiler::ParseRule& Compiler::getRule(TokenType type) const {
         const static ParseRule empty{};
         const static std::unordered_map<TokenType, ParseRule> rules{
@@ -117,7 +159,17 @@ namespace lox {
             {TokenType::Plus, {{}, &Compiler::binary, Precedence::Term}},
             {TokenType::Slash, {{}, &Compiler::binary, Precedence::Factor}},
             {TokenType::Star, {{}, &Compiler::binary, Precedence::Factor}},
+            {TokenType::Bang, {&Compiler::unary}},
+            {TokenType::BangEqual, {nullptr, &Compiler::binary, Precedence::Equality}},
+            {TokenType::EqualEqual, {nullptr, &Compiler::binary, Precedence::Equality}},
+            {TokenType::Greater, {nullptr, &Compiler::binary, Precedence::Comparison}},
+            {TokenType::GreaterEqual, {nullptr, &Compiler::binary, Precedence::Comparison}},
+            {TokenType::Less, {nullptr, &Compiler::binary, Precedence::Comparison}},
+            {TokenType::LessEqual, {nullptr, &Compiler::binary, Precedence::Comparison}},
             {TokenType::Number, {&Compiler::number}},
+            {TokenType::False, {&Compiler::literal}},
+            {TokenType::True, {&Compiler::literal}},
+            {TokenType::Nil, {&Compiler::literal}},
             {TokenType::Question, {{}, &Compiler::ternary, Precedence::Ternary}}};
 
         auto iter = rules.find(type);

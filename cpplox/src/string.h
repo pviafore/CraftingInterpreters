@@ -82,7 +82,8 @@ namespace lox {
         using value_type = char*;
         StringView() : start(nullptr), length(0) {}
         StringView(const char* start, size_t length) : start(start), length(length) {}
-        StringView(const char* start, const char* end) : start(start), length(end - start) {}
+        StringView(const char* start, const char* end) : StringView(start, end - start) {}
+        StringView(const char* start) : StringView(start, strlen(start)) {}
         String str() const {
             return String(start, length);
         }

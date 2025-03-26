@@ -20,6 +20,10 @@ namespace lox {
         bool diagnosticMode = false;
 
     private:
+        void negate();
+        void runtimeError(StringView sv) const;
+        void verifyNumber(size_t stackIndex = 0) const;
+        double popNumber();
         DynamicStack<Value> stack;
     };
 }

@@ -88,11 +88,22 @@ namespace lox {
             return stack[stack.size() - 1];
         }
 
+        const T& peek(size_t stackIndex = 0) const {
+            if (stack.size() <= stackIndex) {
+                throw lox::Exception("Can't peek from empty stack", nullptr);
+            }
+            return stack[stack.size() - 1 - stackIndex];
+        }
+
         const T* begin() const {
             return stack.begin();
         }
         const T* end() const {
             return stack.end();
+        }
+
+        size_t size() const {
+            return stack.size();
         }
 
     private:

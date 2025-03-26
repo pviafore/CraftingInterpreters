@@ -39,7 +39,7 @@ namespace lox {
     extern Arena arena;
 
     template <typename T>
-    T* reallocate(T* pointer, size_t oldSize, size_t newSize) {
+    [[nodiscard]] T* reallocate(T* pointer, size_t oldSize, size_t newSize) {
         T* result = nullptr;
         if (pointer == nullptr || (oldSize == 0 && newSize != 0)) {
             result = reinterpret_cast<T*>(arena.allocate(newSize));

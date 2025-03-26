@@ -48,6 +48,7 @@ namespace lox {
         void unary();
         void binary();
         void ternary();
+        void literal();
         size_t previousLine() const;
         void parsePrecedence(Precedence precedence);
         const ParseRule& getRule(TokenType type) const;

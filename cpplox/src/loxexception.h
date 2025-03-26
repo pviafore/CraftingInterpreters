@@ -6,8 +6,8 @@
 #include <stacktrace>
 #include <string>
 
-// Peter Muldoon's Omega Exception
 namespace lox {
+    // Peter Muldoon's Omega Exception
     template <typename DATA_T>
     class ExceptionBase {
     public:

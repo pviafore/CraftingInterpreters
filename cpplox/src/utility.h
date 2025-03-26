@@ -9,5 +9,6 @@ namespace lox {
 
         friend auto operator<=>(const Pair& lhs, const Pair& rhs) = default;
     };
+
 }
 #endif

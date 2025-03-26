@@ -3,13 +3,12 @@
 #include <iomanip>
 #include <print>
 
-template <class... Ts>
-struct overload : Ts... {
-    using Ts::operator()...;
-};
-template <class... Ts>
-overload(Ts...) -> overload<Ts...>;
 namespace lox {
+
+    std::ostream& operator<<(std::ostream& out, const Value& value) {
+        std::visit([&out](auto x) { out << x; }, value);
+        return out;
+    }
 
     void printChunk(const lox::Chunk& chunk, std::string_view name) {
         std::println("== {} ==", name);

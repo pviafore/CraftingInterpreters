@@ -227,7 +227,7 @@ namespace lox {
             if (ptr - start > 1) {
                 switch (*(start + 1)) {
                 case 'a':
-                    return checkKeyword(2, "lse", TokenType::Else);
+                    return checkKeyword(2, "lse", TokenType::False);
                 case 'o':
                     return checkKeyword(2, "r", TokenType::For);
                 case 'u':

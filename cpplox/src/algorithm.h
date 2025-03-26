@@ -4,6 +4,7 @@
 #include <functional>
 
 #include "loxexception.h"
+#include "optional.h"
 #include "utility.h"
 namespace lox {
 
@@ -130,6 +131,20 @@ namespace lox {
                 *r2 = e;
                 ++r2;
             }
+        }
+
+        template <range Range>
+        constexpr lox::Optional<typename Range::value_type> max(Range& r) {
+            if (r.begin() == r.end()) {
+                return {};
+            }
+            auto val = *r.begin();
+            for (const auto& e : r) {
+                if (e > val) {
+                    val = e;
+                }
+            }
+            return val;
         }
     }
 }

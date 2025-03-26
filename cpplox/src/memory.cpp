@@ -249,7 +249,7 @@ namespace lox {
             writeIntToMemory(previousBlock + 4, nextIndex);
         }
         if (nextIndex != POOL_SENTINEL) {
-            auto nextBlock = memory + previousIndex;
+            auto nextBlock = memory + nextIndex;
             writeIntToMemory(nextBlock, previousIndex);
             nextBlock[0] |= std::byte{1 << 7};  // restore free bit
         }

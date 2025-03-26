@@ -16,7 +16,7 @@ namespace lox {
 
         ~Vector() {
             if (capacity) {
-                reallocate(data, sizeof(T) * capacity, 0);
+                data = reallocate(data, sizeof(T) * capacity, 0);
             }
         }
 
@@ -65,7 +65,7 @@ namespace lox {
             }
         }
 
-        T operator[](size_t index) const {
+        const T& operator[](size_t index) const {
             if (index >= count) {
                 throw lox::Exception("Index out of bounds for vector access", nullptr);
             }

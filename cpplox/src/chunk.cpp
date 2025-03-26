@@ -16,14 +16,27 @@ namespace lox {
         case OpCode::Multiply:
         case OpCode::Subtract:
             return Binary(buffer);
+        case OpCode::Greater:
+        case OpCode::Less:
+            return BinaryPredicate(buffer);
         case OpCode::Constant:
             return Constant(buffer);
         case OpCode::LongConstant:
             return LongConstant(buffer);
+        case OpCode::Equal:
+            return Equal{};
         case OpCode::Negate:
             return Negate{};
+        case OpCode::Not:
+            return Not{};
         case OpCode::Return:
             return Return{};
+        case OpCode::Nil:
+            return Nil{};
+        case OpCode::True:
+            return True{};
+        case OpCode::False:
+            return False{};
         default:
             return Unknown{buffer};
         }
@@ -83,6 +96,11 @@ namespace lox {
     // Inequality operator
     bool Chunk::InstructionIterator::operator!=(const InstructionIterator& other) const {
         return current != other.current;
+    }
+
+    Instruction* Chunk::InstructionIterator::operator->() {
+        parseInstruction();
+        return &instruction;
     }
 
     void Chunk::InstructionIterator::parseInstruction() {
