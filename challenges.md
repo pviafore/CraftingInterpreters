@@ -565,3 +565,18 @@ In Lox, - was already mentioned, and all I can find otherwise is the < token, as
 
 I would treat the ternary as an infix on the ? symbol. We know we would have already parsed an expression (Which would put a bool on the stack, presumably). Then, we parse the infix operation (should be higher than assignment, but before or/and). We could then parse an expression, and then consume the :. We would then parse the following expression (hopefully it is handled by parens to give a grouping). I don't know how to do the jumps yet, but it doesn't seem so bad.
 
+# Chapter 18
+
+1) What other commands could have a similar treatment to the comparison operators
+
+- False could be True > Not
+- Subtract could be Operand 1 > Operand 2 > Negate > Add
+- Multiply could be Operand 1 > Constant 1 >  Constant 1 > (Operand 2) Divide > Divide
+
+
+2) What opcodes would you introduce to make things much faster in the language
+
+Arithmetic codes
+
+- Exponentiation
+- Remainder

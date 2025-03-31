@@ -3,6 +3,7 @@
 
 #include <cstring>
 
+#include "algorithm.h"
 #include "loxexception.h"
 #include "memory.h"
 namespace lox {
@@ -22,13 +23,15 @@ namespace lox {
 
         Vector(const Vector& rhs) {
             data = reallocate(data, 0, sizeof(T) * rhs.capacity);
-            memcpy(data, rhs.data, rhs.count * sizeof(T));
+            auto src = lox::ranges::from_buffer(rhs.data, rhs.count);
+            lox::ranges::copy(src, data);
             capacity = rhs.capacity;
             count = rhs.count;
         };
         Vector& operator=(const Vector& rhs) {
             data = reallocate(data, sizeof(T) * capacity, sizeof(T) * rhs.capacity);
-            memcpy(data, rhs.data, rhs.count * sizeof(T));
+            auto src = lox::ranges::from_buffer(rhs.data, rhs.count);
+            lox::ranges::copy(src, data);
             capacity = rhs.capacity;
             count = rhs.count;
             return *this;
@@ -121,8 +124,13 @@ namespace lox {
                     (T*)reallocate(data, sizeof(T) * capacity, sizeof(T) * newCapacity);
                 capacity = newCapacity;
             }
-            memcpy(data + count, begin, requestedSize * sizeof(T));
+
+            lox::ranges::copy(lox::ranges::from_buffer(begin, requestedSize), data + count);
             count += requestedSize;
+        }
+
+        void pop_back() {
+            eraseAt(size() - 1);
         }
 
         void eraseAt(size_t index) {

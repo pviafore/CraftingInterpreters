@@ -1,6 +1,7 @@
 #ifndef CLOXCPP_MEMORY_H_
 #define CLOXCPP_MEMORY_H_
 
+#include <atomic>
 #include <new>
 
 #include "array.h"
@@ -23,6 +24,7 @@ namespace lox {
         void addToFreePool(size_t poolIndex, std::byte* memory);
         std::byte* popBlockFromPool(size_t poolIndex);
         std::byte* getBuddy(size_t poolIndex, std::byte* memory) const;
+        bool isInFreeList(std::byte* block, size_t poolIndex) const;
         bool isFree(std::byte* block) const;
         void removeBlockFromPool(std::byte* block);
         void verifyNotFreed(std::byte* block) const;
@@ -55,10 +57,89 @@ namespace lox {
     }
 
     template <typename T>
-    T* allocate(size_t size) {
-        T* pointer;
-        return reallocate(pointer, 0, size);
+    T* allocate(size_t size = sizeof(T)) {
+        return reallocate<T>(nullptr, 0, size);
     }
+
+    template <typename T>
+    void deallocate(T* p) {
+        // just put a 1 in the old size to force a deallocation
+        std::ignore = reallocate(p, 1, 0);
+    }
+
+    template <typename T>
+    class SharedPtr {
+    public:
+        SharedPtr() {}
+        SharedPtr(T* inPtr) {
+            ctrlBlock = allocate<ControlBlock>();
+            ctrlBlock.refCount++;
+            ctrlBlock.rawPtr = inPtr;
+        }
+
+        SharedPtr(const SharedPtr& sp) {
+            this->ctrlBlock = sp.ctrlBlock;
+            if (this->ctrlBlock) {
+                this->ctrlBlock->IncrementRef();
+            }
+        }
+
+        SharedPtr& operator=(const SharedPtr& sp) {
+            this->ctrlBlock = sp.ctrlBlock;
+            if (this->ctrlBlock) {
+                this->ctrlBlock->IncrementRef();
+            }
+            return *this;
+        }
+
+        friend auto operator<=>(const SharedPtr& lhs, const SharedPtr& rhs) = default;
+
+        SharedPtr(SharedPtr&& sp) {
+            this->ctrlBlock = sp.ctrlBlock;
+            sp.ctrlBlock = nullptr;
+        }
+        SharedPtr& operator=(SharedPtr&& sp) {
+            if (this == &sp) {
+                return *this;
+            }
+            if (this->ctrlBlock) {
+                this->ctrlBlock.DecrementRef();  // got to remove the old one
+            }
+            this->ctrlBlock = sp.ctrlBlock;
+            sp->ctrlBlock = nullptr;
+            return *this;
+        }
+
+        ~SharedPtr() {
+            if (ctrlBlock) {
+                ctrlBlock->DecrementRef();
+            }
+        }
+
+        static SharedPtr<T> Make() {
+            return SharedPtr(allocate<T>());
+        }
+
+    private:
+        class ControlBlock {
+        private:
+            std::atomic<size_t> refCount = 0;
+            T* rawPtr = nullptr;
+
+        public:
+            void DecrementRef() {
+                if (refCount.fetch_sub(1) == 1) {
+                    deallocate(rawPtr);
+                    deallocate<ControlBlock>(this);
+                }
+            }
+
+            void IncrementRef() {
+                refCount++;
+            }
+        };
+        ControlBlock* ctrlBlock = nullptr;
+    };
 
 }
 #endif

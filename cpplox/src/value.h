@@ -3,8 +3,12 @@
 
 #include <format>
 #include <variant>
+
+#include "memory.h"
 namespace lox {
-    using Value = std::variant<bool, std::nullptr_t, double>;
+
+    class Object;
+    using Value = std::variant<bool, std::nullptr_t, double, SharedPtr<Object>>;
 
     inline bool isFalsey(Value value) {
         return std::holds_alternative<nullptr_t>(value) || (std::holds_alternative<bool>(value) && !std::get<bool>(value));
@@ -31,6 +35,7 @@ struct std::formatter<lox::Value, char> {
         auto s = std::visit(
             overload{
                 [&ctx](nullptr_t) { return "nil"s; },
+                [&ctx](lox::SharedPtr<lox::Object>) { return "[Object object]"s; },
                 [&ctx](auto v) { return std::to_string(v); }},
             v);
         return std::ranges::copy(s, ctx.out()).out;

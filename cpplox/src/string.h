@@ -12,7 +12,7 @@ namespace lox {
     public:
         using iterator = char*;
         using const_iterator = const char*;
-        String() {}
+        String() { buffer.push_back(0); }
         String(const char* data) : String(data, strlen(data)) {
         }
 
@@ -21,11 +21,12 @@ namespace lox {
             buffer.push_back(0);  // null terminate the string
         }
         template <sized_range Range>
-        String(const Range& range) : String(range.begin(), range.size()) {}
+        String(const Range& range) : String(range.begin(), range.size()) { buffer.push_back(0); }
 
         String(size_t count, char value = '\0') {
             buffer.reserve(count);
             lox::ranges::fill_n(BackInsertIterator(buffer), count, value);
+            buffer.push_back(0);
         }
 
         friend bool operator==(const String& lhs, const String& rhs) {
@@ -58,10 +59,12 @@ namespace lox {
 
         friend std::istream& operator>>(std::istream& in, String& s) {
             char chars[1024] = {0};
+            s.buffer.pop_back();  // pop the null terminating character
             while (in.get(chars, 1024)) {
                 size_t length = strlen(chars);
                 s.buffer.push_back(chars, chars + length);
             }
+            s.buffer.push_back(0);
             in.clear();
             in.ignore();
             return in;

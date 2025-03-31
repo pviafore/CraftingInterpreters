@@ -147,7 +147,7 @@ namespace lox {
         // while we have a buddy, combine it and move it up the pool
         auto leftMostBlock = blockStart;
         auto buddy = getBuddy(poolIndex, blockStart);
-        while (poolIndex < 27 && isFree(buddy)) {
+        while (poolIndex < 27 && isInFreeList(buddy, poolIndex)) {
             removeBlockFromPool(buddy);
             poolIndex++;
             leftMostBlock = std::min(leftMostBlock, buddy);
@@ -185,12 +185,12 @@ namespace lox {
         size_t targetIndex = poolIndex;
         auto buddy = getBuddy(targetIndex, block);
         // find if we can grow to our block without copying
-        while (targetIndex < 27 && getPoolSize(targetIndex + 1) < newSize && isFree(buddy)) {
+        while (targetIndex < 27 && getPoolSize(targetIndex + 1) < newSize && isInFreeList(buddy, targetIndex)) {
             targetIndex++;
             buddy = getBuddy(targetIndex, block);
         }
         // if we have a target index that we can grow to
-        if (targetIndex < 27 && isFree(buddy)) {
+        if (targetIndex < 27 && isInFreeList(buddy, targetIndex)) {
             auto leftmostFreeBlock = block;
             for (size_t index = poolIndex; index <= targetIndex; ++index) {
                 auto buddy = getBuddy(index, block);
@@ -233,6 +233,17 @@ namespace lox {
         return memory + buddyOffset;
     }
 
+    bool Arena::isInFreeList(std::byte* block, size_t targetIndex) const {
+        auto current = pools[targetIndex];
+        while (current != POOL_SENTINEL) {
+            if (memory + current == block) {
+                return true;
+            }
+
+            current = readIntFromMemory(memory + current + 4);
+        }
+        return false;
+    }
     bool Arena::isFree(std::byte* block) const {
         return static_cast<uint8_t>(*block) >= 128;  // if first bit is set
     }
@@ -275,11 +286,13 @@ namespace lox {
     void Arena::addToFreePool(size_t poolIndex, std::byte* block) {
         uint32_t firstBlockOffset = pools[poolIndex];
         uint32_t newBlockOffset = static_cast<uint32_t>(block - memory);
+
         if (firstBlockOffset != POOL_SENTINEL) {
             std::byte* firstBlock = memory + firstBlockOffset;
             writeIntToMemory(firstBlock, newBlockOffset);
             firstBlock[0] |= std::byte{1 << 7};  // restore free bit
         }
+
         writeIntToMemory(block, POOL_SENTINEL);
         writeIntToMemory(block + 4, firstBlockOffset);
         block[0] |= std::byte{1 << 7};  // no previous link, but mark as free
