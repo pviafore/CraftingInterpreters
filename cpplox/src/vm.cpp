@@ -20,8 +20,12 @@ namespace lox {
     }
 
     bool areEqual(Value val1, Value val2) {
-        if (std::holds_alternative<SharedPtr<String>>(val1) && std::holds_alternative<SharedPtr<String>>(val2)) {
-            return **std::get<SharedPtr<String>>(val1) == **std::get<SharedPtr<String>>(val2);
+        if (isString(val1) && isString(val2)) {
+            auto s = std::holds_alternative<StringView>(val1) ? std::get<StringView>(val1)
+                                                              : StringView(**std::get<SharedPtr<String>>(val1));
+            auto s2 = std::holds_alternative<StringView>(val2) ? std::get<StringView>(val2)
+                                                               : StringView(**std::get<SharedPtr<String>>(val2));
+            return s == s2;
         } else {
             return val1 == val2;
         }
@@ -70,9 +74,14 @@ namespace lox {
             const auto b = popNumber();
             stack.push(bin.getOp()(popNumber(), b));
         } else if (isString(stack.peek(0)) && isString(stack.peek(1)) && bin.opcode == OpCode::Add) {
-            auto s2 = std::get<SharedPtr<String>>(stack.pop());
-            auto s = SharedPtr<String>::Make(**std::get<SharedPtr<String>>(stack.pop()));
-            s->push_back(**s2);
+            auto val2 = stack.pop();
+            auto val1 = stack.pop();
+            auto s = SharedPtr<String>::Make(std::holds_alternative<StringView>(val1) ? String{std::get<StringView>(val1)} : **std::get<SharedPtr<String>>(val1));
+            if (std::holds_alternative<StringView>(val2)) {
+                s->push_back(std::get<StringView>(val2));
+            } else {
+                s->push_back(**std::get<SharedPtr<String>>(val2));
+            }
             stack.push(s);
         } else {
             throw lox::Exception("Invalid type for binary expression", nullptr);
@@ -99,10 +108,4 @@ namespace lox {
         verifyNumber();
         return std::get<double>(stack.pop());
     }
-
-    SharedPtr<String> VM::popString() {
-        verifyString();
-        return std::get<SharedPtr<String>>(stack.pop());
-    }
-
 }

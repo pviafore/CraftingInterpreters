@@ -155,6 +155,19 @@ namespace lox {
             }
             return val;
         }
+
+        template <range Range1, range Range2>
+        constexpr bool is_equal(Range1& r1, Range2& r2) {
+            auto it1 = r1.begin();
+            auto it2 = r2.begin();
+            while (it1 != r1.end() && it2 != r2.end()) {
+                if (*it1++ != *it2++) {
+                    return false;
+                }
+            }
+
+            return it1 == r1.end() && it2 == r2.end();
+        }
     }
 }
 #endif

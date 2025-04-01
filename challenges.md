@@ -580,3 +580,25 @@ Arithmetic codes
 
 - Exponentiation
 - Remainder
+
+# Chapter 19
+
+1) Make it so that a string uses flexible array members
+
+I don't like this pattern all that much, and it doesn't jive with the changes I've made, so I'm skipping this problem.
+
+The way to do it is to have a std::byte[1] as the last member of your string, and then when you allocate it, you pass in the size of the string, plus whatever
+buffer you want to go to (the extra 1 will be your null terminating byte). Then, whenever you reallocate it, you just have to track the extra bytes
+in your calculation to say the ultimate size that you want. It also is kinda weird since I'm reference counting my stringts.
+
+2) Make a "Constant String". I think I will reuse my stringview for this, as it's just a pointer to a begin and an end. Since this is just two pointers,
+I don't think I'll reference count it, since no memory needs to be managed
+
+3) If this was your language, would you allow implicit conversion on a string operand adding something else
+
+I use Python and C++ where this is mostly disallowed, so I prefer not to have it. Implicit conversions bite me all the time in other languages,
+ so I like the idea of a runtime error that calls it out, as its most likely not what you want (you typically want variable interpolation or 
+ formatting that's a bit better than just concatenation). It also could force some unwanted allocations at times.
+
+I do think there's value in being able to add any string-ish things together though (like in C++ a std::string and char*). I do that here with a internal String
+and a StringView

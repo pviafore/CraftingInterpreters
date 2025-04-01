@@ -25,7 +25,6 @@ namespace lox {
         void runtimeError(StringView sv) const;
         void verifyNumber(size_t stackIndex = 0) const;
         void verifyString(size_t stackIndex = 0) const;
-        double popNumber();
         SharedPtr<String> popString();
         void binaryOp(const Binary& bin);
         DynamicStack<Value> stack;

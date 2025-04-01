@@ -45,7 +45,7 @@ namespace lox {
 
     void Compiler::string() {
         auto token = parser.getPreviousToken().token;
-        auto s = SharedPtr<String>::Make(StringView(token.begin() + 1, token.end() - 1));
+        auto s = StringView(token.begin() + 1, token.end() - 1);
         emitConstant(s);
     }
 

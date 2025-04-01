@@ -106,6 +106,7 @@ namespace lox {
         StringView(const char* start, size_t length) : start(start), length(length) {}
         StringView(const char* start, const char* end) : StringView(start, end - start) {}
         StringView(const char* start) : StringView(start, strlen(start)) {}
+        StringView(const String& s) : StringView(s.begin(), s.end()) {}
         String str() const {
             return String(start, length);
         }
@@ -120,6 +121,10 @@ namespace lox {
 
         size_t size() const {
             return length;
+        }
+
+        friend bool operator==(const StringView& sv1, const StringView& sv2) {
+            return ranges::is_equal(sv1, sv2);
         }
 
     private:
