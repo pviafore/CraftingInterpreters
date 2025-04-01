@@ -19,6 +19,14 @@ namespace lox {
         return run(chunk.value());
     }
 
+    bool areEqual(Value val1, Value val2) {
+        if (std::holds_alternative<SharedPtr<String>>(val1) && std::holds_alternative<SharedPtr<String>>(val2)) {
+            return **std::get<SharedPtr<String>>(val1) == **std::get<SharedPtr<String>>(val2);
+        } else {
+            return val1 == val2;
+        }
+    }
+
     InterpretResult VM::run(const Chunk& chunk) {
         auto ip = chunk.begin();
         Optional<InterpretResult> returnCode;
@@ -33,16 +41,16 @@ namespace lox {
                 }
                 std::visit(
                     overload{
-                        [this](const Binary& bin) { const auto b = popNumber(); stack.push(bin.getOp()(popNumber(), b)); },
+                        [this](const Binary& bin) { binaryOp(bin); },
                         [this](const BinaryPredicate& bin) { const auto b = popNumber(); stack.push(bin.getPredicate()(popNumber(), b)); },
                         [&chunk, this](const Constant& c) { stack.push(chunk.getConstant(c.value())); },
                         [&chunk, this](const LongConstant& c) { stack.push(chunk.getConstant(c.value())); },
-                        [this](const Equal&) { stack.push(stack.pop() == stack.pop()); },
+                        [this](const Equal&) { stack.push(areEqual(stack.pop(), stack.pop())); },
                         [this](const False&) { stack.push(false); },
                         [this](const Negate&) { this->negate(); },
                         [this](const Nil&) { stack.push(nullptr); },
                         [this](const Not&) { stack.push(isFalsey(stack.pop())); },
-                        [&returnCode, this](const Return&) { std::println("{}", std::get<double>(stack.pop())); returnCode = InterpretResult::Ok; },
+                        [&returnCode, this](const Return&) { std::println("{}", stack.pop()); returnCode = InterpretResult::Ok; },
                         [this](const True&) { stack.push(true); },
                         [&returnCode](const Unknown&) { returnCode = InterpretResult::CompileError; }},
                     instruction.instruction());
@@ -57,8 +65,27 @@ namespace lox {
         return InterpretResult::Ok;
     }
 
+    void VM::binaryOp(const Binary& bin) {
+        if (isNumber(stack.peek(0)) && isNumber(stack.peek(1))) {
+            const auto b = popNumber();
+            stack.push(bin.getOp()(popNumber(), b));
+        } else if (isString(stack.peek(0)) && isString(stack.peek(1)) && bin.opcode == OpCode::Add) {
+            auto s2 = std::get<SharedPtr<String>>(stack.pop());
+            auto s = SharedPtr<String>::Make(**std::get<SharedPtr<String>>(stack.pop()));
+            s->push_back(**s2);
+            stack.push(s);
+        } else {
+            throw lox::Exception("Invalid type for binary expression", nullptr);
+        }
+    }
+
     void VM::verifyNumber(size_t stackIndex) const {
-        if (!std::holds_alternative<double>(stack.peek(stackIndex))) {
+        if (!isNumber(stack.peek(stackIndex))) {
+            throw lox::Exception("Operand must be a number", nullptr);
+        }
+    }
+    void VM::verifyString(size_t stackIndex) const {
+        if (!isString(stack.peek(stackIndex))) {
             throw lox::Exception("Operand must be a number", nullptr);
         }
     }
@@ -71,6 +98,11 @@ namespace lox {
     double VM::popNumber() {
         verifyNumber();
         return std::get<double>(stack.pop());
+    }
+
+    SharedPtr<String> VM::popString() {
+        verifyString();
+        return std::get<SharedPtr<String>>(stack.pop());
     }
 
 }

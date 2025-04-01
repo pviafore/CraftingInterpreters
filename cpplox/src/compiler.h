@@ -43,6 +43,7 @@ namespace lox {
         void emit(OpCode b1);
         void emitConstant(Value value);
         void number();
+        void string();
         void expression();
         void grouping();
         void unary();

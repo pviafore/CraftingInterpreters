@@ -3,6 +3,7 @@
 #include <print>
 
 #include "debug.h"
+#include "span.h"
 
 namespace lox {
     Compiler::Compiler(const String& s) : scanner(s), parser(scanner.begin()) {}
@@ -14,7 +15,7 @@ namespace lox {
             outChunk.value().write(OpCode::Return, parser.getPreviousToken().line);
         }
         if (debugMode && !parser.hasError()) {
-            std::println("{}", chunk);
+            std::println("{}", outChunk.value());
         }
         return outChunk;
     }
@@ -42,10 +43,15 @@ namespace lox {
         emitConstant(value);
     }
 
+    void Compiler::string() {
+        auto token = parser.getPreviousToken().token;
+        auto s = SharedPtr<String>::Make(StringView(token.begin() + 1, token.end() - 1));
+        emitConstant(s);
+    }
+
     void Compiler::emitConstant(Value value) {
         try {
-            auto num = std::get<double>(value);
-            getCurrentChunk().writeConstant(num, previousLine());
+            getCurrentChunk().writeConstant(value, previousLine());
         } catch (lox::Exception& e) {
             parser.errorAtPrevious(e.what().c_str());
         }
@@ -167,6 +173,7 @@ namespace lox {
             {TokenType::Less, {nullptr, &Compiler::binary, Precedence::Comparison}},
             {TokenType::LessEqual, {nullptr, &Compiler::binary, Precedence::Comparison}},
             {TokenType::Number, {&Compiler::number}},
+            {TokenType::String, {&Compiler::string}},
             {TokenType::False, {&Compiler::literal}},
             {TokenType::True, {&Compiler::literal}},
             {TokenType::Nil, {&Compiler::literal}},

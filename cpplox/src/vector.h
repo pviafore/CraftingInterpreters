@@ -6,6 +6,7 @@
 #include "algorithm.h"
 #include "loxexception.h"
 #include "memory.h"
+#include "span.h"
 namespace lox {
     template <typename T>
     class Vector {
@@ -16,24 +17,15 @@ namespace lox {
         Vector() {}
 
         ~Vector() {
-            if (capacity) {
-                data = reallocate(data, sizeof(T) * capacity, 0);
-            }
+            clear();
         }
 
         Vector(const Vector& rhs) {
-            data = reallocate(data, 0, sizeof(T) * rhs.capacity);
-            auto src = lox::ranges::from_buffer(rhs.data, rhs.count);
-            lox::ranges::copy(src, data);
-            capacity = rhs.capacity;
-            count = rhs.count;
-        };
+            push_back(rhs.begin(), rhs.end());
+        }
         Vector& operator=(const Vector& rhs) {
-            data = reallocate(data, sizeof(T) * capacity, sizeof(T) * rhs.capacity);
-            auto src = lox::ranges::from_buffer(rhs.data, rhs.count);
-            lox::ranges::copy(src, data);
-            capacity = rhs.capacity;
-            count = rhs.count;
+            clear();
+            push_back(rhs.begin(), rhs.end());
             return *this;
         }
 
@@ -82,7 +74,12 @@ namespace lox {
         }
 
         void clear() {
-            reallocate(data, sizeof(T) * capacity, 0);
+            if (capacity) {
+                for (size_t i = 0; i < count; ++i) {
+                    std::destroy_at(data + i);
+                }
+                data = reallocate(data, sizeof(T) * capacity, 0);
+            }
             data = nullptr;
             count = 0;
             capacity = 0;
@@ -125,7 +122,7 @@ namespace lox {
                 capacity = newCapacity;
             }
 
-            lox::ranges::copy(lox::ranges::from_buffer(begin, requestedSize), data + count);
+            lox::ranges::uninitialized_copy(lox::Span(begin, requestedSize), data + count);
             count += requestedSize;
         }
 
@@ -137,6 +134,7 @@ namespace lox {
             if (index >= count) {
                 throw lox::Exception("Can't erase past our usual index", nullptr);
             }
+            std::destroy_at(data + index);
             for (; index < count - 1; ++index) {
                 data[index] = data[index - 1];
             }

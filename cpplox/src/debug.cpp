@@ -3,12 +3,8 @@
 #include <iomanip>
 #include <print>
 
+#include "value.h"
 namespace lox {
-
-    std::ostream& operator<<(std::ostream& out, const Value& value) {
-        std::visit([&out](auto x) { out << x; }, value);
-        return out;
-    }
 
     void printChunk(const lox::Chunk& chunk, std::string_view name) {
         std::println("== {} ==", name);
@@ -16,10 +12,10 @@ namespace lox {
     }
 
     void constantInstruction(std::ostringstream& out, const Chunk& chunk, const lox::Constant& c) {
-        out << std::left << std::setw(16) << "OP_CONSTANT" << " " << std::setw(4) << static_cast<size_t>(c.value()) << " " << chunk.getConstant(c.value()) << std::right;
+        out << std::format("{:<16}{}", "OP_CONSTANT", chunk.getConstant(c.value()));
     }
     void constantInstruction(std::ostringstream& out, const Chunk& chunk, const lox::LongConstant& c) {
-        out << std::left << std::setw(16) << "OP_LONGCONSTANT" << " " << std::setw(4) << c.value() << " " << chunk.getConstant(c.value()) << std::right;
+        out << std::format("{:<16}{}", "OP_LONGCONSTANT", chunk.getConstant(c.value()));
     }
 
     void disassembleInstruction(const lox::Chunk& chunk, const lox::Instruction& instruction) {

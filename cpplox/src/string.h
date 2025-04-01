@@ -21,7 +21,7 @@ namespace lox {
             buffer.push_back(0);  // null terminate the string
         }
         template <sized_range Range>
-        String(const Range& range) : String(range.begin(), range.size()) { buffer.push_back(0); }
+        String(const Range& range) : String(range.begin(), range.size()) {}
 
         String(size_t count, char value = '\0') {
             buffer.reserve(count);
@@ -31,6 +31,19 @@ namespace lox {
 
         friend bool operator==(const String& lhs, const String& rhs) {
             return lhs.buffer == rhs.buffer;
+        }
+
+        friend String operator+(const String& lhs, const String& rhs) {
+            String out = lhs;
+            out.push_back(rhs);
+            return out;
+        }
+
+        template <range Range>
+        void push_back(const Range& range) {
+            buffer.pop_back();  // pop the null terminating character
+            buffer.push_back(range.begin(), range.end());
+            buffer.push_back(0);
         }
 
         char& operator[](size_t index) {
@@ -45,16 +58,18 @@ namespace lox {
             return buffer.begin();
         }
 
+        // do not include the null terminator
         const_iterator end() const {
-            return buffer.end();
+            return buffer.end() - 1;
         }
 
         iterator begin() {
             return buffer.begin();
         }
 
+        // do not include the null terminator
         iterator end() {
-            return buffer.end();
+            return buffer.end() - 1;
         }
 
         friend std::istream& operator>>(std::istream& in, String& s) {
@@ -72,6 +87,10 @@ namespace lox {
 
         bool empty() const {
             return buffer.size() == 0;
+        }
+
+        const char* c_str() const {
+            return &buffer[0];
         }
 
         friend struct std::formatter<String>;
@@ -109,11 +128,12 @@ namespace lox {
     };
 }
 template <>
-struct std::formatter<lox::String, char> {
-    constexpr auto parse(auto& ctx) { return ctx.begin(); }
+struct std::formatter<lox::String> : std::formatter<std::string> {
+    constexpr auto parse(auto& ctx) {
+        return std::formatter<std::string>{}.parse(ctx);
+    }
     auto format(const lox::String& s, auto& ctx) const {
-        lox::ranges::copy(s.buffer, ctx.out());
-        return ctx.out();
+        return std::formatter<std::string>{}.format(std::string(s.begin(), s.end()), ctx);
     }
 };
 

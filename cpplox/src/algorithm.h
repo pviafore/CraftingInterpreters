@@ -111,22 +111,6 @@ namespace lox {
     }
     namespace ranges {
 
-        template <typename T>
-        class from_buffer {
-        public:
-            from_buffer(const T* ptr, size_t size) : ptr(ptr), size(size) {}
-            const T* begin() const {
-                return ptr;
-            }
-
-            const T* end() const {
-                return ptr + size;
-            }
-
-        private:
-            const T* ptr = nullptr;
-            size_t size = 0;
-        };
         template <range Range>
         void fill(Range& r, typename Range::value_type v) {
             for (auto& e : r) {
@@ -146,6 +130,14 @@ namespace lox {
         void copy(Range1&& r1, Iterator r2) {
             for (const auto& e : r1) {
                 *r2 = e;
+                ++r2;
+            }
+        }
+
+        template <range Range1, typename Iterator>
+        void uninitialized_copy(Range1&& r1, Iterator r2) {
+            for (const auto& e : r1) {
+                std::construct_at((typename Range1::value_type*)r2, e);
                 ++r2;
             }
         }

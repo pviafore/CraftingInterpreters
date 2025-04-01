@@ -161,7 +161,7 @@ namespace lox {
             write(static_cast<uint8_t>((values.size() >> 8) & 0xFF), line);
         }
         write(static_cast<uint8_t>(values.size() & 0xFF), line);
-        values.push_back(value);
+        values.push_back(std::move(value));
     }
 
     Value Chunk::getConstant(size_t index) const {

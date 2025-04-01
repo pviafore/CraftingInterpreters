@@ -73,28 +73,30 @@ namespace lox {
         SharedPtr() {}
         SharedPtr(T* inPtr) {
             ctrlBlock = allocate<ControlBlock>();
-            ctrlBlock.refCount++;
-            ctrlBlock.rawPtr = inPtr;
+            std::construct_at(ctrlBlock, inPtr);
         }
 
         SharedPtr(const SharedPtr& sp) {
             this->ctrlBlock = sp.ctrlBlock;
             if (this->ctrlBlock) {
-                this->ctrlBlock->IncrementRef();
+                this->ctrlBlock->incrementRef();
             }
         }
 
         SharedPtr& operator=(const SharedPtr& sp) {
+            if (this->ctrlBlock) {
+                this->ctrlBlock->decrementRef();  // got to remove the old one
+            }
             this->ctrlBlock = sp.ctrlBlock;
             if (this->ctrlBlock) {
-                this->ctrlBlock->IncrementRef();
+                this->ctrlBlock->incrementRef();
             }
             return *this;
         }
 
         friend auto operator<=>(const SharedPtr& lhs, const SharedPtr& rhs) = default;
 
-        SharedPtr(SharedPtr&& sp) {
+        SharedPtr(SharedPtr<T>&& sp) {
             this->ctrlBlock = sp.ctrlBlock;
             sp.ctrlBlock = nullptr;
         }
@@ -103,21 +105,32 @@ namespace lox {
                 return *this;
             }
             if (this->ctrlBlock) {
-                this->ctrlBlock.DecrementRef();  // got to remove the old one
+                this->ctrlBlock->decrementRef();  // got to remove the old one
             }
             this->ctrlBlock = sp.ctrlBlock;
             sp->ctrlBlock = nullptr;
             return *this;
         }
 
+        T* operator*() const {
+            return this->ctrlBlock != nullptr ? this->ctrlBlock->get() : nullptr;
+        }
+
+        T* operator->() const {
+            return this->ctrlBlock != nullptr ? this->ctrlBlock->get() : nullptr;
+        }
+
         ~SharedPtr() {
             if (ctrlBlock) {
-                ctrlBlock->DecrementRef();
+                ctrlBlock->decrementRef();
             }
         }
 
-        static SharedPtr<T> Make() {
-            return SharedPtr(allocate<T>());
+        template <typename... Args>
+        static SharedPtr<T> Make(Args&&... args) {
+            T* ptr = allocate<T>();
+            std::construct_at(ptr, std::forward<Args>(args)...);
+            return SharedPtr(ptr);
         }
 
     private:
@@ -127,15 +140,22 @@ namespace lox {
             T* rawPtr = nullptr;
 
         public:
-            void DecrementRef() {
+            ControlBlock(T* rawPtr) : refCount(1), rawPtr(rawPtr) {
+            }
+            void decrementRef() {
                 if (refCount.fetch_sub(1) == 1) {
+                    std::destroy_at(rawPtr);
                     deallocate(rawPtr);
                     deallocate<ControlBlock>(this);
                 }
             }
 
-            void IncrementRef() {
+            void incrementRef() {
                 refCount++;
+            }
+
+            T* get() const {
+                return rawPtr;
             }
         };
         ControlBlock* ctrlBlock = nullptr;

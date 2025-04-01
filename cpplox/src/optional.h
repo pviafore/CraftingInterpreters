@@ -16,7 +16,7 @@ namespace lox {
 
         ~Optional() {}
 
-        T value() const {
+        T& value() {
             if (!_hasValue) {
                 throw lox::Exception("Bad optional access", nullptr);
             }
