@@ -602,3 +602,16 @@ I use Python and C++ where this is mostly disallowed, so I prefer not to have it
 
 I do think there's value in being able to add any string-ish things together though (like in C++ a std::string and char*). I do that here with a internal String
 and a StringView
+
+# Chapter 20
+
+1.  In clox, we only have keys that are strings, but how do you handle first class collection for different types of keys?
+
+The nice thing is, since I templated in C++, I have the ability already. Users just need to define a getHash on their type and it should work.
+
+2.  How do other hash decisions factor into things:
+
+I think this wikipedia article covers it quite well: https://en.wikipedia.org/wiki/Hash_table. It talks about open addressing vs chaining, probing,
+cuckloo hashing (which I want to learn more about) and others.
+
+3. I'm not doing benchmarks (same as previous reasons)
