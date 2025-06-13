@@ -2,71 +2,11 @@
 
 #include <cstring>
 #include <print>
+#include <utility>
 
 #include "algorithm.h"
 #include "loxexception.h"
 namespace lox {
-    constexpr size_t toPoolIndex(size_t memory) {
-        switch (memory) {
-        case 1 << 0:
-            return 0;
-        case 1 << 1:
-            return 1;
-        case 1 << 2:
-            return 2;
-        case 1 << 3:
-            return 3;
-        case 1 << 4:
-            return 4;
-        case 1 << 5:
-            return 5;
-        case 1 << 6:
-            return 6;
-        case 1 << 7:
-            return 7;
-        case 1 << 8:
-            return 8;
-        case 1 << 9:
-            return 9;
-        case 1 << 10:
-            return 10;
-        case 1 << 11:
-            return 11;
-        case 1 << 12:
-            return 12;
-        case 1 << 13:
-            return 13;
-        case 1 << 14:
-            return 14;
-        case 1 << 15:
-            return 15;
-        case 1 << 16:
-            return 16;
-        case 1 << 17:
-            return 17;
-        case 1 << 18:
-            return 18;
-        case 1 << 19:
-            return 19;
-        case 1 << 20:
-            return 20;
-        case 1 << 21:
-            return 21;
-        case 1 << 22:
-            return 22;
-        case 1 << 23:
-            return 23;
-        case 1 << 24:
-            return 24;
-        case 1 << 25:
-            return 25;
-        case 1 << 26:
-            return 26;
-        case 1 << 27:
-            return 27;
-        }
-    }
-
     size_t poolSizes[] = {1 << 0, 1 << 1, 1 << 2, 1 << 3, 1 << 4, 1 << 5, 1 << 6, 1 << 7, 1 << 8, 1 << 9,
                           1 << 10, 1 << 11, 1 << 12, 1 << 13, 1 << 14, 1 << 15, 1 << 16, 1 << 17, 1 << 18, 1 << 19,
                           1 << 20, 1 << 21, 1 << 22, 1 << 23, 1 << 24, 1 << 25, 1 << 26, 1 << 27, 1 << 28, 1 << 29,

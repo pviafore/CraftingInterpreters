@@ -23,6 +23,13 @@ namespace lox {
             return _value;
         }
 
+        const T& value() const {
+            if (!_hasValue) {
+                throw lox::Exception("Bad optional access", nullptr);
+            }
+            return _value;
+        }
+
         operator bool() const {
             return _hasValue;
         }

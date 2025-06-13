@@ -6,20 +6,29 @@
 
 #include "algorithm.h"
 #include "iterator.h"
+#include "span.h"
 #include "vector.h"
 namespace lox {
+    size_t getHash(Span<char> s);
     class String {
     public:
         using iterator = char*;
         using const_iterator = const char*;
-        String() { buffer.push_back(0); }
+        String() {
+            buffer.push_back(0);
+            hashString();
+        }
         String(const char* data) : String(data, strlen(data)) {
         }
 
         String(const char* data, size_t length) {
             buffer.push_back(data, data + length);
             buffer.push_back(0);  // null terminate the string
+            hashString();
         }
+
+        String(const char* start, const char* end) : String(start, end - start) {}
+
         template <sized_range Range>
         String(const Range& range) : String(range.begin(), range.size()) {}
 
@@ -27,9 +36,13 @@ namespace lox {
             buffer.reserve(count);
             lox::ranges::fill_n(BackInsertIterator(buffer), count, value);
             buffer.push_back(0);
+            hashString();
         }
 
         friend bool operator==(const String& lhs, const String& rhs) {
+            if (lhs.hash != rhs.hash) {
+                return false;
+            }
             return lhs.buffer == rhs.buffer;
         }
 
@@ -39,14 +52,7 @@ namespace lox {
             return out;
         }
 
-        template <range Range>
-        void push_back(const Range& range) {
-            buffer.pop_back();  // pop the null terminating character
-            buffer.push_back(range.begin(), range.end());
-            buffer.push_back(0);
-        }
-
-        char& operator[](size_t index) {
+        char operator[](size_t index) const {
             return buffer[index];
         }
 
@@ -93,9 +99,26 @@ namespace lox {
             return &buffer[0];
         }
 
+        size_t getHash() const {
+            return hash;
+        }
+
+        template <range Range>
+        void push_back(const Range& range) {
+            buffer.pop_back();  // pop the null terminating character
+            buffer.push_back(range.begin(), range.end());
+            buffer.push_back(0);
+            hashString();
+        }
+
         friend struct std::formatter<String>;
 
     private:
+        void hashString() {
+            hash = lox::getHash(buffer);
+        }
+
+        size_t hash = 0;
         Vector<char> buffer;
     };
 
@@ -121,6 +144,9 @@ namespace lox {
 
         size_t size() const {
             return length;
+        }
+        size_t getHash() const {
+            return lox::getHash({start, length});
         }
 
         friend bool operator==(const StringView& sv1, const StringView& sv2) {

@@ -3,6 +3,7 @@
 
 #include "stack.h"
 #include "string.h"
+#include "table.h"
 #include "value.h"
 namespace lox {
     class Chunk;
@@ -25,7 +26,7 @@ namespace lox {
         void runtimeError(StringView sv) const;
         void verifyNumber(size_t stackIndex = 0) const;
         void verifyString(size_t stackIndex = 0) const;
-        SharedPtr<String> popString();
+        double popNumber();
         void binaryOp(const Binary& bin);
         DynamicStack<Value> stack;
     };

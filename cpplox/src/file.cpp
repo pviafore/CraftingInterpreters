@@ -20,13 +20,14 @@ namespace lox {
         size_t filesize = ftell(file);
         rewind(file);
 
-        s = String(filesize + 1);
-        size_t bytesread = fread(&s[0], sizeof(char), filesize, file);
+        char* buffer = allocate<char>(filesize + 1);
+        size_t bytesread = fread(buffer, sizeof(char), filesize, file);
+
         if (bytesread < filesize) {
             throw lox::Exception("Could not read enough of the file", nullptr);
         }
 
         read = true;
-        return s;
+        return String(buffer, filesize + 1);
     }
 }

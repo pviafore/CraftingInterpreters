@@ -11,6 +11,7 @@
 namespace lox {
     constexpr uint32_t _1GB = 1024 * 1024 * 1024;
     constexpr uint32_t POOL_SENTINEL = _1GB;
+
     class Arena {
     public:
         Arena();
@@ -108,7 +109,7 @@ namespace lox {
                 this->ctrlBlock->decrementRef();  // got to remove the old one
             }
             this->ctrlBlock = sp.ctrlBlock;
-            sp->ctrlBlock = nullptr;
+            sp.ctrlBlock = nullptr;
             return *this;
         }
 

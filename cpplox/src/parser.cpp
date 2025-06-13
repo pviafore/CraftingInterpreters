@@ -22,6 +22,7 @@ namespace lox {
         } else {
             std::print(std::cerr, " at {}", token.token);
         }
+
         std::println(std::cerr, ": {}", message);
         error = true;
         panicMode = true;

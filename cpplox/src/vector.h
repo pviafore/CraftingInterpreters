@@ -50,13 +50,21 @@ namespace lox {
             return *this;
         }
 
+        // this actually makes an allocation, but size does not change
         void reserve(size_t newCapacity) {
-            if (newCapacity > capacity) {
-                data = reallocate(data, sizeof(T) * capacity, sizeof(T) * newCapacity);
-                if (data == nullptr) {
-                    throw lox::Exception("Could not allocate enough memory", nullptr);
+            adjustCapacity(newCapacity);
+        }
+
+        void resize(size_t newSize, const T& value) {
+            if (count > newSize) {
+                for (size_t index = count; index > newSize; --index) {
+                    eraseAt(index - 1);
                 }
-                this->capacity = newCapacity;
+            } else if (count < newSize) {
+                reserve(newSize);
+                for (size_t index = count; index < newSize; ++index) {
+                    push_back(value);
+                }
             }
         }
 
@@ -112,16 +120,7 @@ namespace lox {
         // assumes that we can ptrdiff it
         void push_back(const T* begin, const T* end) {
             auto requestedSize = end - begin;
-            size_t newCapacity = capacity;
-            while (newCapacity < count + requestedSize) {
-                newCapacity = std::max(8uz, newCapacity * 2);
-            }
-            if (newCapacity != capacity) {
-                data =
-                    (T*)reallocate(data, sizeof(T) * capacity, sizeof(T) * newCapacity);
-                capacity = newCapacity;
-            }
-
+            adjustCapacity(requestedSize);
             lox::ranges::uninitialized_copy(lox::Span(begin, requestedSize), data + count);
             count += requestedSize;
         }
@@ -152,6 +151,21 @@ namespace lox {
         }
 
     private:
+        void adjustCapacity(size_t requestedSize) {
+            size_t newCapacity = capacity;
+            while (newCapacity < count + requestedSize) {
+                newCapacity = std::max(8uz, newCapacity * 2);
+            }
+            if (newCapacity != capacity) {
+                data =
+                    (T*)reallocate(data, sizeof(T) * capacity, sizeof(T) * newCapacity);
+                if (data == nullptr) {
+                    throw lox::Exception("Could not allocate enough memory", nullptr);
+                }
+                capacity = newCapacity;
+            }
+        }
+
         T* data = nullptr;
         size_t count = 0;
         size_t capacity = 0;

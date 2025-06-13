@@ -4,6 +4,7 @@
 #include <format>
 #include <utility>
 
+#include "interned.h"
 #include "string.h"
 namespace lox {
 
@@ -106,7 +107,7 @@ namespace lox {
         TokenIterator end() const;
 
     private:
-        String s;
+        InternedString s;
     };
 }
 

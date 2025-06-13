@@ -4,13 +4,14 @@
 #include <format>
 #include <variant>
 
+#include "interned.h"
 #include "memory.h"
 #include "object.h"
 #include "span.h"
 namespace lox {
 
     // span is used for a "constant" string
-    using Value = std::variant<bool, std::nullptr_t, double, SharedPtr<String>, StringView>;
+    using Value = std::variant<bool, std::nullptr_t, double, InternedString>;
 
     inline bool isFalsey(Value value) {
         return std::holds_alternative<nullptr_t>(value) || (std::holds_alternative<bool>(value) && !std::get<bool>(value));
@@ -20,7 +21,7 @@ namespace lox {
         return std::holds_alternative<double>(value);
     }
     inline bool isString(Value value) {
-        return std::holds_alternative<SharedPtr<String>>(value) || std::holds_alternative<StringView>(value);
+        return std::holds_alternative<InternedString>(value);
     }
 }
 
@@ -41,8 +42,7 @@ struct std::formatter<lox::Value> : std::formatter<std::string> {
             // but I don't care enough for printing to screen, the string formatter is way easier to use
             overload{
                 [&ctx](nullptr_t) { return "nil"s; },
-                [&ctx](lox::SharedPtr<lox::String> s) { return "\"" + std::string(s->begin(), s->end()) + "\""; },
-                [&ctx](lox::StringView s) { return "\"" + std::string(s.begin(), s.end()) + "\""; },
+                [&ctx](lox::InternedString v) { return "\"" + std::string(v.begin(), v.end()) + "\""; },
                 [&ctx](bool v) { return v ? "true"s : "false"s; },
                 [&ctx](double v) { return std::format("{}", v); },
             },
