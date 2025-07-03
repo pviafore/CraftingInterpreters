@@ -31,6 +31,8 @@ namespace lox {
         size_t size() const;
         size_t getHash() const;
 
+        StringView string() const;
+
         friend bool operator==(InternedString i1, InternedString i2) {
             return ranges::is_equal(i1, i2);
         };

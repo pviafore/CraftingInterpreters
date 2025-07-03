@@ -23,6 +23,18 @@ namespace lox {
             return Constant(buffer);
         case OpCode::LongConstant:
             return LongConstant(buffer);
+        case OpCode::DefineGlobal:
+            return DefineGlobal{buffer};
+        case OpCode::LongDefineGlobal:
+            return LongDefineGlobal{buffer};
+        case OpCode::GetGlobal:
+            return GetGlobal{buffer};
+        case OpCode::LongGetGlobal:
+            return LongGetGlobal{buffer};
+        case OpCode::SetGlobal:
+            return SetGlobal(buffer);
+        case OpCode::LongSetGlobal:
+            return LongSetGlobal(buffer);
         case OpCode::Equal:
             return Equal{};
         case OpCode::Negate:
@@ -33,6 +45,10 @@ namespace lox {
             return Return{};
         case OpCode::Nil:
             return Nil{};
+        case OpCode::Print:
+            return Print{};
+        case OpCode::Pop:
+            return Pop{};
         case OpCode::True:
             return True{};
         case OpCode::False:
@@ -54,15 +70,7 @@ namespace lox {
         return std::visit([](const auto& i) { return i.size; }, _instruction);
     }
 
-    uint8_t Constant::value() const {
-        return constantAddress;
-    }
-
-    uint32_t LongConstant::value() const {
-        return address;
-    }
-
-    uint32_t LongConstant::toAddress(const std::byte* buffer) {
+    uint32_t toAddress(const std::byte* buffer) {
         return (static_cast<uint8_t>(*buffer) << 16) + (static_cast<uint8_t>(*(buffer + 1)) << 8) + static_cast<uint8_t>(*(buffer + 2));
     }
 
@@ -150,21 +158,42 @@ namespace lox {
     }
 
     void Chunk::writeConstant(Value value, size_t line) {
-        if (values.size() == 0xFFFFFF) {
-            // 24 bits
-            throw lox::Exception("Can only have 2^24 constants", nullptr);
-        }
         OpCode opcode = values.size() <= std::numeric_limits<uint8_t>::max() ? OpCode::Constant : OpCode::LongConstant;
         write(opcode, line);
-        if (values.size() > std::numeric_limits<uint8_t>::max()) {
-            write(static_cast<uint8_t>((values.size() >> 16) & 0xFF), line);
-            write(static_cast<uint8_t>((values.size() >> 8) & 0xFF), line);
-        }
-        write(static_cast<uint8_t>(values.size() & 0xFF), line);
+        auto index = addConstant(std::move(value));
+        write(index, line);
+    }
+
+    void Chunk::writeOpAndIndex(OpCode small, OpCode large, size_t value, size_t line) {
+        OpCode opcode = value <= std::numeric_limits<uint8_t>::max() ? small : large;
+        write(opcode, line);
+        write(value, line);
+    }
+
+    size_t Chunk::addConstant(Value value) {
         values.push_back(std::move(value));
+        return values.size() - 1;
+    }
+
+    void Chunk::write(size_t val, size_t line) {
+        if (val > 0xFFFFFF) {
+            // 24 bits
+            throw lox::Exception("Can only have 24-bit values", nullptr);
+        }
+        if (val > std::numeric_limits<uint8_t>::max()) {
+            write(static_cast<uint8_t>((val >> 16) & 0xFF), line);
+            write(static_cast<uint8_t>((val >> 8) & 0xFF), line);
+        }
+        write(static_cast<uint8_t>(val & 0xFF), line);
     }
 
     Value Chunk::getConstant(size_t index) const {
         return values[index];
     }
+    template <>
+    size_t getValueSize<uint8_t>() { return 2; }
+
+    template <>
+    size_t getValueSize<uint32_t>() { return 4; }
+
 }

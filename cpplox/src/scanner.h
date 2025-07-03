@@ -75,6 +75,7 @@ namespace lox {
             return ti1.ptr != ti2.ptr;
         }
         Token* operator->();
+        const Token* operator->() const;
 
     private:
         void parseToken();

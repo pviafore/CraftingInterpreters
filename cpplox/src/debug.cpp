@@ -11,11 +11,9 @@ namespace lox {
         std::println("{}", chunk);
     }
 
-    void constantInstruction(std::ostringstream& out, const Chunk& chunk, const lox::Constant& c) {
-        out << std::format("{:<16}{}", "OP_CONSTANT", chunk.getConstant(c.value()));
-    }
-    void constantInstruction(std::ostringstream& out, const Chunk& chunk, const lox::LongConstant& c) {
-        out << std::format("{:<16}{}", "OP_LONGCONSTANT", chunk.getConstant(c.value()));
+    template <typename I>
+    void withValue(std::ostringstream& out, const Chunk& chunk, const I& i) {
+        out << std::format("{:<32}{}", i.name, chunk.getConstant(i.value()));
     }
 
     void disassembleInstruction(const lox::Chunk& chunk, const lox::Instruction& instruction) {
@@ -33,8 +31,7 @@ namespace lox {
         }
         auto inst = instruction.instruction();
         auto overloads = overload{
-            [&out, &chunk, &instruction](Constant& c) { constantInstruction(out, chunk, c); },
-            [&out, &chunk, &instruction](LongConstant& c) { constantInstruction(out, chunk, c); },
+            [&out, &chunk, &instruction]<typename T>(_OpAndValueInstruction<T>& o) { withValue(out, chunk, o); },
             // simple instructions that are just a name
             [&out](auto i) { out << i.name; },
         };

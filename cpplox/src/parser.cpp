@@ -4,15 +4,15 @@
 namespace lox {
     Parser::Parser(TokenIterator token) : current(token) {
     }
-    void Parser::errorAtCurrent(const String& message) {
+    void Parser::errorAtCurrent(StringView message) {
         printError(*current, message);
     }
 
-    void Parser::errorAtPrevious(const String& message) {
+    void Parser::errorAtPrevious(StringView message) {
         printError(previous, message);
     }
 
-    void Parser::printError(const Token& token, const String& message) {
+    void Parser::printError(const Token& token, StringView message) {
         if (panicMode) {
             return;
         }
@@ -44,7 +44,7 @@ namespace lox {
         return previous;
     }
 
-    void Parser::consume(TokenType type, const String& message) {
+    void Parser::consume(TokenType type, StringView message) {
         if (current->type == type) {
             advance();
             return;
@@ -59,4 +59,43 @@ namespace lox {
     const Token& Parser::getCurrentToken() {
         return *current;
     }
+
+    bool Parser::match(TokenType type) {
+        if (!check(type)) {
+            return false;
+        }
+        advance();
+        return true;
+    }
+
+    bool Parser::check(TokenType type) {
+        return current->type == type;
+    }
+
+    bool Parser::inPanicMode() const {
+        return panicMode;
+    }
+
+    void Parser::synchronize() {
+        panicMode = false;
+        while (current->type != TokenType::Eof) {
+            if (previous.type == TokenType::Semicolon) {
+                return;
+            }
+            switch (current->type) {
+            case TokenType::Class:
+            case TokenType::Fun:
+            case TokenType::Var:
+            case TokenType::For:
+            case TokenType::If:
+            case TokenType::While:
+            case TokenType::Print:
+            case TokenType::Return:
+                return;
+            default:;  // do nothing
+            }
+            advance();
+        }
+    }
+
 }

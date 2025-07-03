@@ -30,7 +30,7 @@ namespace lox {
         bool debugMode = false;
 
     private:
-        using ParseFn = std::function<void(Compiler*)>;
+        using ParseFn = std::function<void(Compiler*, bool)>;
         struct ParseRule {
             ParseFn prefix{};
             ParseFn infix{};
@@ -41,18 +41,30 @@ namespace lox {
         void emit(std::byte byte);
         void emit(OpCode b1, std::byte b2);
         void emit(OpCode b1);
+        void emit(size_t val);
         void emitConstant(Value value);
-        void number();
-        void string();
+        void emitNamedVariable(StringView name, bool canAssign);
+        void number(bool);
+        void string(bool);
         void expression();
-        void grouping();
-        void unary();
-        void binary();
-        void ternary();
-        void literal();
+        void grouping(bool);
+        void unary(bool);
+        void binary(bool);
+        void ternary(bool);
+        void literal(bool);
+
+        void declaration();
+        void statement();
+        void printStatement();
+        void expressionStatement();
+        void varDeclaration();
+        void variable(bool);
         size_t previousLine() const;
         void parsePrecedence(Precedence precedence);
         const ParseRule& getRule(TokenType type) const;
+        size_t parseVariable(StringView errorMessage);
+        size_t addIdentifierConstant(StringView name);
+        void defineVariable(size_t global);
         Scanner scanner;
         Parser parser;
         Chunk chunk;

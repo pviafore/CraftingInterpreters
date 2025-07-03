@@ -12,7 +12,11 @@ namespace lox {
     enum class OpCode : uint8_t {
         Add,
         Constant,
+        DefineGlobal,
+        LongDefineGlobal,
         Equal,
+        GetGlobal,
+        LongGetGlobal,
         Greater,
         Less,
         Nil,
@@ -23,7 +27,11 @@ namespace lox {
         LongConstant,
         Multiply,
         Negate,
+        Print,
+        Pop,
         Return,
+        SetGlobal,
+        LongSetGlobal,
         Subtract,
         Unknown
     };
@@ -36,22 +44,57 @@ namespace lox {
         std::string name;
     };
 
-    class Constant : public _Instruction {
+    template <typename T>
+    size_t getValueSize();
+
+    template <typename T>
+    class _OpAndValueInstruction : public _Instruction {
     public:
-        Constant(const std::byte* buffer) : _Instruction(OpCode::Constant, 2, "OP_CONSTANT"), constantAddress(static_cast<uint8_t>(*(buffer + 1))) {}
-        uint8_t value() const;
+        _OpAndValueInstruction(const std::byte* buffer, OpCode opcode, std::string s) : _Instruction(opcode, getValueSize<T>(), s), constantAddress(*reinterpret_cast<const T*>(buffer + 1)) {}
+        T value() const {
+            return constantAddress;
+        }
 
     private:
-        uint8_t constantAddress;
+        T constantAddress;
     };
-    class LongConstant : public _Instruction {
-    public:
-        LongConstant(const std::byte* buffer) : _Instruction(OpCode::LongConstant, 4, "OP_LONG_CONSTANT"), address(toAddress(buffer + 1)) {}
-        uint32_t value() const;
 
-    private:
-        uint32_t address;
-        uint32_t toAddress(const std::byte* buffer);
+    class Constant : public _OpAndValueInstruction<uint8_t> {
+    public:
+        Constant(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Constant, "OP_CONSTANT") {}
+    };
+
+    uint32_t toAddress(const std::byte* buffer);
+    class LongConstant : public _OpAndValueInstruction<uint32_t> {
+    public:
+        LongConstant(const std::byte* buffer) : _OpAndValueInstruction<uint32_t>(buffer, OpCode::Constant, "OP_LONG_CONSTANT") {}
+    };
+    class DefineGlobal : public _OpAndValueInstruction<uint8_t> {
+    public:
+        DefineGlobal(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Constant, "OP_DEFINE_GLOBAL") {}
+    };
+
+    class LongDefineGlobal : public _OpAndValueInstruction<uint32_t> {
+    public:
+        LongDefineGlobal(const std::byte* buffer) : _OpAndValueInstruction<uint32_t>(buffer, OpCode::Constant, "OP_LONG_DEFINE_GLOBAL") {}
+    };
+    class GetGlobal : public _OpAndValueInstruction<uint8_t> {
+    public:
+        GetGlobal(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Constant, "OP_GET_GLOBAL") {}
+    };
+
+    class LongGetGlobal : public _OpAndValueInstruction<uint32_t> {
+    public:
+        LongGetGlobal(const std::byte* buffer) : _OpAndValueInstruction<uint32_t>(buffer, OpCode::Constant, "OP_LONG_GET_GLOBAL") {}
+    };
+    class SetGlobal : public _OpAndValueInstruction<uint8_t> {
+    public:
+        SetGlobal(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Constant, "OP_SET_GLOBAL") {}
+    };
+
+    class LongSetGlobal : public _OpAndValueInstruction<uint32_t> {
+    public:
+        LongSetGlobal(const std::byte* buffer) : _OpAndValueInstruction<uint32_t>(buffer, OpCode::Constant, "OP_LONG_SET_GLOBAL") {}
     };
 
     class Equal : public _Instruction {
@@ -80,10 +123,20 @@ namespace lox {
     public:
         Negate() : _Instruction(OpCode::Negate, 1, "OP_NEGATE") {}
     };
+    class Print : public _Instruction {
+    public:
+        Print() : _Instruction(OpCode::Print, 1, "OP_PRINT") {}
+    };
+
+    class Pop : public _Instruction {
+    public:
+        Pop() : _Instruction(OpCode::Pop, 1, "OP_POP") {}
+    };
     class Return : public _Instruction {
     public:
         Return() : _Instruction(OpCode::Return, 1, "OP_RETURN") {}
     };
+
     class Unknown : public _Instruction {
     public:
         Unknown(const std::byte* buffer) : _Instruction(OpCode{static_cast<uint8_t>(*buffer)}, 1, "OP_UNKNOWN: " + std::to_string(static_cast<uint32_t>(*buffer))) {}
@@ -166,7 +219,8 @@ namespace lox {
         Instruction(Instruction&& rhs) = default;
         Instruction& operator=(Instruction&& rhs) = default;
 
-        using InstVariant = std::variant<Binary, BinaryPredicate, Constant, Equal, False, LongConstant, Negate, Nil, Not, Return, True, Unknown>;
+        using InstVariant = std::variant<Binary, BinaryPredicate, Constant, DefineGlobal, GetGlobal, Equal, False, LongConstant, LongDefineGlobal, LongGetGlobal,
+                                         Negate, Nil, Not, Print, Pop, Return, SetGlobal, LongSetGlobal, True, Unknown>;
         InstVariant instruction() const;
         size_t offset() const;
         size_t size() const;
@@ -211,9 +265,12 @@ namespace lox {
         void write(lox::OpCode value, size_t line);
         void write(uint8_t value, size_t line);
         void write(std::byte value, size_t line);
+        void write(size_t value, size_t line);
         void writeConstant(Value value, size_t line);
+        void writeOpAndIndex(OpCode small, OpCode large, size_t value, size_t line);
         Value getConstant(size_t index) const;
 
+        size_t addConstant(Value value);
         size_t getLineNumber(size_t offset) const;
 
         InstructionIterator begin() const;

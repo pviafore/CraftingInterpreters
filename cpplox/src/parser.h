@@ -6,16 +6,20 @@ namespace lox {
     class Parser {
     public:
         Parser(TokenIterator token);
-        void errorAtCurrent(const String& message);
-        void errorAtPrevious(const String& message);
+        void errorAtCurrent(StringView message);
+        void errorAtPrevious(StringView message);
         bool hasError() const;
-        void consume(TokenType, const String& message);
+        void consume(TokenType, StringView message);
         const Token& getPreviousToken() const;
         const Token& getCurrentToken();
         Token& advance();
+        bool match(TokenType type);
+        bool check(TokenType type);
+        bool inPanicMode() const;
+        void synchronize();
 
     private:
-        void printError(const Token& t, const String& message);
+        void printError(const Token& t, StringView message);
         TokenIterator current;
         Token previous;
         bool error = false;

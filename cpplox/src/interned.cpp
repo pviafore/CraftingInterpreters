@@ -42,6 +42,10 @@ namespace lox {
         return lox::getHash(str);
     }
 
+    StringView InternedString::string() const {
+        return StringView{begin(), end()};
+    }
+
     const char* begin(const InternedString::UnderlyingString& us) {
         if (std::holds_alternative<StringView>(us)) {
             return std::get<StringView>(us).begin();
