@@ -13,7 +13,7 @@ namespace lox {
 
     template <typename I>
     void withValue(std::ostringstream& out, const Chunk& chunk, const I& i) {
-        out << std::format("{:<32}{}", i.name, chunk.getConstant(i.value()));
+        out << std::format("{:<32}{}({})", i.name, chunk.getConstant(i.value()), i.value());
     }
 
     void disassembleInstruction(const lox::Chunk& chunk, const lox::Instruction& instruction) {
@@ -31,7 +31,14 @@ namespace lox {
         }
         auto inst = instruction.instruction();
         auto overloads = overload{
-            [&out, &chunk, &instruction]<typename T>(_OpAndValueInstruction<T>& o) { withValue(out, chunk, o); },
+            [&out, &chunk, &instruction](Constant& o) { withValue(out, chunk, o); },
+            [&out, &chunk, &instruction](LongConstant& o) { withValue(out, chunk, o); },
+            [&out, &chunk, &instruction](DefineGlobal& o) { withValue(out, chunk, o); },
+            [&out, &chunk, &instruction](LongDefineGlobal& o) { withValue(out, chunk, o); },
+            [&out, &chunk, &instruction](GetGlobal& o) { withValue(out, chunk, o); },
+            [&out, &chunk, &instruction](LongGetGlobal& o) { withValue(out, chunk, o); },
+            [&out, &chunk, &instruction](SetGlobal& o) { withValue(out, chunk, o); },
+            [&out, &chunk, &instruction](LongSetGlobal& o) { withValue(out, chunk, o); },
             // simple instructions that are just a name
             [&out](auto i) { out << i.name; },
         };

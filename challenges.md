@@ -615,3 +615,25 @@ I think this wikipedia article covers it quite well: https://en.wikipedia.org/wi
 cuckloo hashing (which I want to learn more about) and others.
 
 3. I'm not doing benchmarks (same as previous reasons)
+
+
+# Chapter 21
+
+1.  We're creating a new constant every time we see an identifier. Optimize it. How does this affect the performance of the compiler compared to the runtime. Is this the right trade-off?
+
+So, we can hash the variable so that every time we see it, we can look up the existing constant in a hash table in the compiler. It will slow down the compile by a linear amount, but it means at runtime we won't run out of values. It won't necessarily make our runtime faster, since the lookup for globals is the same, but it does allow bigger programs (however, since I have long constants, it may be moot). Perhaps it helps with the compiler by keeping the chunk smaller and we have more locality in cache.
+
+Note, this is a per-chunk optimization , each line in a repl will allocate a new chunk per line.
+
+2.  Looking up a global variable in a hash table might be used can be slow, how is a more efficient way to store and access global variables?
+
+I'll be honest, when you have a O(1) data structure, you can either look it up less, or you can be more efficient with cache with a linear data structure. If we can somehow 
+store just chunk index instead of name, but that's a hash table as well. You could preprocess the file and assign the indices replaced in the source code, but then we aren't single pass anymore. So I don't actually know this one yet.
+
+If they are a constant, you could also do the lookup at compile time to get the chunk index and use that as a raw constant operation
+
+3. Should we report unsued variables in functions at compile time for a script, since we see everything?
+
+I am torn on this. On one hand, with a language that lets you metaprogram, you may be creating globals at runtime that will eventually be resolved. Also, you may want iterative development and to write functions that aren't called yet (or the variable is commented out like debug=1). This can lead to false negatives, which I don't like. 
+
+However, it is to be argued that this is not clean code, and should be an error and cleaned up.

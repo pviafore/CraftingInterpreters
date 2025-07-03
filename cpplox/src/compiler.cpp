@@ -13,6 +13,7 @@ namespace lox {
         }
         parser.consume(TokenType::Eof, "Expect end of expression");
         auto outChunk = parser.hasError() ? Optional<Chunk>{} : Optional{chunk};
+        constants.clear();
         if (outChunk) {
             outChunk.value().write(OpCode::Return, parser.getPreviousToken().line);
         }
@@ -276,7 +277,10 @@ namespace lox {
     }
 
     size_t Compiler::addIdentifierConstant(StringView name) {
-        return getCurrentChunk().addConstant(name);
+        if (!constants.get(name).has_value()) {
+            constants.insert(name, getCurrentChunk().addConstant(name));
+        }
+        return constants.get(name).value();
     }
 
     void Compiler::defineVariable(size_t global) {

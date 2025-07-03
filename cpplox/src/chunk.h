@@ -6,6 +6,7 @@
 #include <variant>
 
 #include "common.h"
+#include "table.h"
 #include "value.h"
 #include "vector.h"
 namespace lox {

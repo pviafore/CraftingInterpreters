@@ -68,6 +68,7 @@ namespace lox {
         Scanner scanner;
         Parser parser;
         Chunk chunk;
+        Table<InternedString, size_t> constants;
     };
 }
 #endif
