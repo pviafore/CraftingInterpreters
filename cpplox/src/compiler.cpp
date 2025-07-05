@@ -2,6 +2,7 @@
 
 #include <print>
 
+#include "algorithm.h"
 #include "debug.h"
 #include "span.h"
 
@@ -227,8 +228,31 @@ namespace lox {
     void Compiler::statement() {
         if (parser.match(TokenType::Print)) {
             printStatement();
+        } else if (parser.match(TokenType::LeftBrace)) {
+            beginScope();
+            block();
+            endScope();
         } else {
             expressionStatement();
+        }
+    }
+
+    void Compiler::block() {
+        while (!parser.check(TokenType::RightBrace) && !parser.check(TokenType::Eof)) {
+            declaration();
+        }
+        parser.consume(TokenType::RightBrace, "Expect '}' after block.");
+    }
+
+    void Compiler::beginScope() {
+        depth++;
+    }
+    void Compiler::endScope() {
+        depth--;
+
+        while (locals.size() > 0 && locals.back().depth != depth) {
+            emit(OpCode::Pop);
+            locals.pop_back();
         }
     }
 
@@ -249,13 +273,38 @@ namespace lox {
     }
 
     void Compiler::emitNamedVariable(StringView name, bool canAssign) {
-        auto global = addIdentifierConstant(name);
+        OpCode setop = OpCode::SetGlobal;
+        OpCode setLongOp = OpCode::LongSetGlobal;
+        OpCode getop = OpCode::GetGlobal;
+        OpCode getLongOp = OpCode::LongGetGlobal;
+
+        auto index = resolveLocal(name);
+        if (index.hasValue()) {
+            setop = setLongOp = OpCode::SetLocal;
+            getop = getLongOp = OpCode::GetLocal;
+        } else {
+            index = addIdentifierConstant(name);
+        }
+
         if (canAssign && parser.match(TokenType::Equal)) {
             expression();
-            getCurrentChunk().writeOpAndIndex(OpCode::SetGlobal, OpCode::LongSetGlobal, global, parser.getPreviousToken().line);
+            getCurrentChunk().writeOpAndIndex(setop, setLongOp, index.value(), parser.getPreviousToken().line);
         } else {
-            getCurrentChunk().writeOpAndIndex(OpCode::GetGlobal, OpCode::LongGetGlobal, global, parser.getPreviousToken().line);
+            getCurrentChunk().writeOpAndIndex(getop, getLongOp, index.value(), parser.getPreviousToken().line);
         }
+    }
+
+    Optional<size_t> Compiler::resolveLocal(StringView name) {
+        for (int index = locals.size() - 1; index >= 0; --index) {
+            Local& l = locals[index];
+            if (name == l.name) {
+                if (!l.depth.has_value()) {
+                    parser.errorAtPrevious("Can't read local variable in own initializer");
+                }
+                return index;
+            }
+        }
+        return {};
     }
 
     void Compiler::varDeclaration() {
@@ -273,6 +322,9 @@ namespace lox {
 
     size_t Compiler::parseVariable(StringView errorMessage) {
         parser.consume(TokenType::Identifier, errorMessage);
+        declareVariable();
+        if (depth > 0)
+            return 0;  // don't do a global if we are a local
         return addIdentifierConstant(parser.getPreviousToken().token);
     }
 
@@ -284,7 +336,40 @@ namespace lox {
     }
 
     void Compiler::defineVariable(size_t global) {
+        if (depth > 0) {
+            markInitialized();
+            return;
+        }
         getCurrentChunk().writeOpAndIndex(OpCode::DefineGlobal, OpCode::LongDefineGlobal, global, parser.getPreviousToken().line);
     }
 
+    void Compiler::markInitialized() {
+        locals.back().depth = depth;
+    }
+
+    void Compiler::declareVariable() {
+        if (depth == 0) {
+            return;
+        }
+
+        for (auto l : views::reversed<decltype(locals)>(locals)) {
+            if (l.depth.has_value() && l.depth.value() < depth) {
+                break;
+            }
+
+            if (l.name == parser.getPreviousToken().token) {
+                parser.errorAtPrevious("Already a variable with this name in scope");
+            }
+        }
+
+        addLocal(parser.getPreviousToken().token);
+    }
+
+    void Compiler::addLocal(StringView name) {
+        try {
+            locals.push_back({name, {}});
+        } catch (std::runtime_error&) {
+            parser.errorAtCurrent("Too many local variables in function");
+        }
+    }
 }

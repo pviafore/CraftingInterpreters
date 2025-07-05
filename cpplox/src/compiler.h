@@ -2,11 +2,13 @@
 #define LOXCPP_COMPILER_H_
 
 #include <functional>
+#include <limits>
 
 #include "chunk.h"
 #include "optional.h"
 #include "parser.h"
 #include "string.h"
+#include "vector.h"
 namespace lox {
 
     enum class Precedence {
@@ -55,6 +57,9 @@ namespace lox {
 
         void declaration();
         void statement();
+        void block();
+        void beginScope();
+        void endScope();
         void printStatement();
         void expressionStatement();
         void varDeclaration();
@@ -65,10 +70,22 @@ namespace lox {
         size_t parseVariable(StringView errorMessage);
         size_t addIdentifierConstant(StringView name);
         void defineVariable(size_t global);
+        void declareVariable();
+        void addLocal(StringView name);
+        Optional<size_t> resolveLocal(StringView name);
+        void markInitialized();
         Scanner scanner;
         Parser parser;
         Chunk chunk;
         Table<InternedString, size_t> constants;
+
+        struct Local {
+            StringView name;
+            std::optional<size_t> depth;  // will not have a value if its uninitialized
+        };
+        StaticVector<Local, std::numeric_limits<uint8_t>::max()> locals;
+        size_t localCount = 0;
+        size_t depth = 0;
     };
 }
 #endif

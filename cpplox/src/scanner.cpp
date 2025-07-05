@@ -63,9 +63,9 @@ namespace lox {
             return makeToken(TokenType::RightParen);
         case '(':
             return makeToken(TokenType::LeftParen);
-        case '[':
+        case '{':
             return makeToken(TokenType::LeftBrace);
-        case ']':
+        case '}':
             return makeToken(TokenType::RightBrace);
         case ';':
             return makeToken(TokenType::Semicolon);

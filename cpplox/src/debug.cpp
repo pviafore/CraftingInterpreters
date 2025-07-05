@@ -16,6 +16,11 @@ namespace lox {
         out << std::format("{:<32}{}({})", i.name, chunk.getConstant(i.value()), i.value());
     }
 
+    template <typename I>
+    void withLocal(std::ostringstream& out, const I& i) {
+        out << std::format("{:<32}({})", i.name, i.value());
+    }
+
     void disassembleInstruction(const lox::Chunk& chunk, const lox::Instruction& instruction) {
         std::ostringstream out;
         formatInstruction(out, chunk, instruction);
@@ -39,6 +44,8 @@ namespace lox {
             [&out, &chunk, &instruction](LongGetGlobal& o) { withValue(out, chunk, o); },
             [&out, &chunk, &instruction](SetGlobal& o) { withValue(out, chunk, o); },
             [&out, &chunk, &instruction](LongSetGlobal& o) { withValue(out, chunk, o); },
+            [&out, &chunk, &instruction](GetLocal& o) { withLocal(out, o); },
+            [&out, &chunk, &instruction](SetLocal& o) { withLocal(out, o); },
             // simple instructions that are just a name
             [&out](auto i) { out << i.name; },
         };

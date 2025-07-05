@@ -35,6 +35,10 @@ namespace lox {
             return SetGlobal(buffer);
         case OpCode::LongSetGlobal:
             return LongSetGlobal(buffer);
+        case OpCode::SetLocal:
+            return SetLocal(buffer);
+        case OpCode::GetLocal:
+            return GetLocal(buffer);
         case OpCode::Equal:
             return Equal{};
         case OpCode::Negate:

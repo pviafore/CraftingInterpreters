@@ -95,6 +95,13 @@ namespace lox {
             return stack[stack.size() - 1 - stackIndex];
         }
 
+        T& operator[](size_t index) {
+            if (stack.size() <= index) {
+                throw lox::Exception("Invalid stack index", nullptr);
+            }
+            return stack[index];
+        }
+
         const T* begin() const {
             return stack.begin();
         }

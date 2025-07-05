@@ -30,6 +30,9 @@ namespace lox {
         InterpretResult pushGlobal(const Chunk& chunk, uint32_t constant);
         InterpretResult assignGlobal(const Chunk& chunk, uint32_t constant);
 
+        void pushLocal(size_t constant);
+        void assignLocal(size_t constant);
+
         double popNumber();
         void binaryOp(const Binary& bin);
         DynamicStack<Value> stack;

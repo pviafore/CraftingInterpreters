@@ -30,5 +30,42 @@ namespace lox {
         Container& c;
     };
 
+    template <typename T>
+    class ReverseIterator {
+    public:
+        ReverseIterator(T* ptr) : current(ptr) {}
+
+        ReverseIterator* operator=(T value) {
+            *current = value;
+            return this;
+        }
+
+        T& operator*() {
+            return *current;
+        }
+
+        const T& operator*() const {
+            return *current;
+        }
+
+        ReverseIterator& operator++() {
+            --current;
+            return *this;
+        }
+
+        ReverseIterator operator++(int) {
+            ReverseIterator tmp = *this;
+            --current;
+            return tmp;
+        }
+
+        bool operator!=(ReverseIterator& rhs) const {
+            return current != rhs.current;
+        }
+
+    private:
+        T* current;
+    };
+
 }
 #endif

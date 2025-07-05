@@ -4,6 +4,8 @@
 #include <cstring>
 
 #include "algorithm.h"
+#include "array.h"
+#include "iterator"
 #include "loxexception.h"
 #include "memory.h"
 #include "span.h"
@@ -171,6 +173,82 @@ namespace lox {
         size_t capacity = 0;
     };
 
+    template <typename T, size_t Capacity>
+    class StaticVector {
+    public:
+        using value_type = T;
+        T* begin() {
+            return underlying.begin();
+        }
+
+        T* end() {
+            return underlying[_size];
+        }
+
+        const T* begin() const {
+            return underlying.begin();
+        }
+
+        const T* end() const {
+            return underlying[_size];
+        }
+
+        size_t size() const {
+            return _size;
+        }
+
+        size_t capacity() const {
+            return Capacity;
+        }
+
+        void push_back(T value) {
+            if (size() == Capacity) {
+                throw std::runtime_error("No more capacity");
+            }
+            underlying[_size++] = value;
+        }
+
+        Optional<T> pop_back() {
+            if (size() == 0) {
+                return {};
+            }
+
+            return underlying[_size--];
+        }
+
+        T& operator[](size_t index) {
+            if (index >= size()) {
+                throw std::runtime_error("Invalid index");
+            }
+            return underlying[index];
+        }
+
+        T operator[](size_t index) const {
+            if (index >= size()) {
+                throw std::runtime_error("Invalid index");
+            }
+            return underlying[index];
+        }
+
+        ReverseIterator<T> rbegin() {
+            return underlying.begin() + _size - 1;
+        }
+
+        ReverseIterator<T> rend() {
+            return underlying.begin() - 1;
+        }
+
+        T& back() {
+            if (_size == 0) {
+                throw std::runtime_error("Container is empty");
+            }
+            return underlying[_size - 1];
+        }
+
+    private:
+        Array<T, Capacity> underlying;
+        size_t _size = 0;
+    };
 }  // namespace lox
 
 #endif

@@ -54,6 +54,8 @@ namespace lox {
                         [this](const False&) { stack.push(false); },
                         [&chunk, &returnCode, this](const GetGlobal& g) { returnCode = pushGlobal(chunk, g.value()); },
                         [&chunk, &returnCode, this](const LongGetGlobal& g) { returnCode = pushGlobal(chunk, g.value()); },
+                        [&chunk, &returnCode, this](const GetLocal& g) { pushLocal(g.value()); },
+                        [&chunk, &returnCode, this](const SetLocal& s) { assignLocal(s.value()); },
                         [this](const Negate&) { this->negate(); },
                         [this](const Print&) { std::println("{}", stack.pop()); },
                         [this](const Pop&) { stack.pop(); },
@@ -146,5 +148,13 @@ namespace lox {
             return InterpretResult::RuntimeError;
         }
         return InterpretResult::Ok;
+    }
+
+    void VM::pushLocal(size_t number) {
+        stack.push(stack[number]);
+    }
+
+    void VM::assignLocal(size_t number) {
+        stack[number] = stack.peek();
     }
 }

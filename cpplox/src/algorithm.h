@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <functional>
 
+#include "iterator.h"
 #include "loxexception.h"
 #include "optional.h"
 #include "utility.h"
@@ -13,6 +14,12 @@ namespace lox {
         requires(T t) {
             { t.begin() };
             { t.end() };
+        };
+    template <typename T>
+    concept reversible_range =
+        requires(T t) {
+            { t.rbegin() };
+            { t.rend() };
         };
     template <typename R>
     concept sized_range =
@@ -108,6 +115,23 @@ namespace lox {
             std::function<ReturnType(typename Range::value_type)> f;
         };
 
+        template <reversible_range Range>
+        class reversed {
+        public:
+            using value_type = Range::value_type;
+            reversed(reversible_range auto& range) : r(range) {}
+
+            auto begin() const {
+                return ReverseIterator{r.rbegin()};
+            }
+            auto end() const {
+                return ReverseIterator{r.rend()};
+            }
+
+        private:
+            Range& r;
+        };
+
     }
     namespace ranges {
 
@@ -168,6 +192,7 @@ namespace lox {
 
             return it1 == r1.end() && it2 == r2.end();
         }
+
     }
 }
 #endif
