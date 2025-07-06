@@ -79,14 +79,14 @@ namespace lox {
         Parser parser;
         Chunk chunk;
         Table<InternedString, size_t> constants;
-        HashSet<InternedString> immutables;
+        HashSet<String> immutables;
 
         struct Local {
             StringView name;
             Optional<size_t> depth;  // will not have a value if its uninitialized
             bool constant;
         };
-        StaticVector<Local, std::numeric_limits<uint32_t>::max()> locals;
+        StaticVector<Local, 1024> locals;
         size_t localCount = 0;
         size_t depth = 0;
     };
