@@ -78,7 +78,7 @@ namespace lox {
             }
         }
 
-        std::optional<V> get(const K& key) const {
+        Optional<V> get(const K& key) const {
             if (size == 0) {
                 return {};
             }
@@ -91,14 +91,14 @@ namespace lox {
             return std::get<Entry>(entries[index]).value;
         }
 
-        std::optional<K> getKey(const K& key) const {
+        Optional<K> getKey(const K& key) const {
             if (size == 0) {
-                return {};
+                return Optional<K>{};
             }
 
             size_t index = getKeyIndex(entries, key);
             if (!std::holds_alternative<Entry>(entries[index])) {
-                return {};
+                return Optional<K>{};
             }
 
             const Entry& entry = std::get<Entry>(entries[index]);
@@ -142,18 +142,22 @@ namespace lox {
     class HashSet {
     public:
         K insert(const K& key) {
-            if (!table.getKey(key).has_value()) {
+            if (!table.getKey(key).hasValue()) {
                 table.insert(key, nullptr);
             }
             return table.getKey(key).value();
         }
 
-        std::optional<K> get(const K& key) const {
+        Optional<K> get(const K& key) const {
             return table.getKey(key);
         }
 
         bool contains(const K& key) const {
-            return table.getKey(key).has_value();
+            return table.getKey(key).hasValue();
+        }
+
+        void clear() {
+            table.clear();
         }
 
     private:

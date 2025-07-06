@@ -62,28 +62,31 @@ namespace lox {
         void endScope();
         void printStatement();
         void expressionStatement();
-        void varDeclaration();
+        void varDeclaration(bool constant = false);
+        void constDeclaration();
         void variable(bool);
         size_t previousLine() const;
         void parsePrecedence(Precedence precedence);
         const ParseRule& getRule(TokenType type) const;
-        size_t parseVariable(StringView errorMessage);
-        size_t addIdentifierConstant(StringView name);
+        size_t parseVariable(StringView errorMessage, bool constant);
+        size_t addIdentifierConstant(StringView name, bool constant);
         void defineVariable(size_t global);
-        void declareVariable();
-        void addLocal(StringView name);
+        void declareVariable(bool constant);
+        void addLocal(StringView name, bool constant);
         Optional<size_t> resolveLocal(StringView name);
         void markInitialized();
         Scanner scanner;
         Parser parser;
         Chunk chunk;
         Table<InternedString, size_t> constants;
+        HashSet<InternedString> immutables;
 
         struct Local {
             StringView name;
-            std::optional<size_t> depth;  // will not have a value if its uninitialized
+            Optional<size_t> depth;  // will not have a value if its uninitialized
+            bool constant;
         };
-        StaticVector<Local, std::numeric_limits<uint8_t>::max()> locals;
+        StaticVector<Local, std::numeric_limits<uint32_t>::max()> locals;
         size_t localCount = 0;
         size_t depth = 0;
     };

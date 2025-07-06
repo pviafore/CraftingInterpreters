@@ -637,3 +637,21 @@ If they are a constant, you could also do the lookup at compile time to get the 
 I am torn on this. On one hand, with a language that lets you metaprogram, you may be creating globals at runtime that will eventually be resolved. Also, you may want iterative development and to write functions that aren't called yet (or the variable is commented out like debug=1). This can lead to false negatives, which I don't like. 
 
 However, it is to be argued that this is not clean code, and should be an error and cleaned up.
+
+# Chapter 22 
+
+1.  Can you be more efficient than a linear scqan with local resolution?
+
+You could store a hash table mapping name to vector of locals (we are using a vector already). This way, on resolution you can see what your latest binding for that variable is. However, ending scope will be a little more expensive, since we will have to walk the map to find all local variables in scope. This means a stack of variables in scope as well. This means the compiler will take more memory, but runtime should be fastest.
+
+Now, this is all done at compile time, and it will only be super noticeable when you have a very very large amount of variables. It might be better just to cache the index when you see the name to get the index.
+
+2.  Python at least errors out when you do a=a, and I think that's a good thing. There's not any reason why I think someone would want to do this, so I think this is a good error to have, as it is probably a typo.
+
+3.  Implement a const
+
+I like the word const for constant. I could see people using final for being able to seal a class from inheritance too, but I actually don't use that enoug hto find it valuable. So I'll implement const. Personally, I like languages that are immutable by default, and then use a mutable keyword, but ship has sailed for that one.
+
+4. Extend clox to allow more than 256 locals
+
+Done by upping static vector's size

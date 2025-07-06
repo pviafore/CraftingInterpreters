@@ -204,7 +204,15 @@ namespace lox {
         case 'a':
             return checkKeyword(1, "nd", TokenType::And);
         case 'c':
-            return checkKeyword(1, "lass", TokenType::Class);
+            if (ptr - start > 1) {
+                switch (*(start + 1)) {
+                case 'l':
+                    return checkKeyword(2, "ass", TokenType::Class);
+                case 'o':
+                    return checkKeyword(2, "nst", TokenType::Const);
+                }
+            }
+            break;
         case 'e':
             return checkKeyword(1, "lse", TokenType::Else);
         case 'i':

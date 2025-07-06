@@ -232,7 +232,8 @@ namespace lox {
         Instruction& operator=(Instruction&& rhs) = default;
 
         using InstVariant = std::variant<Binary, BinaryPredicate, Constant, DefineGlobal, GetGlobal, Equal, False, LongConstant, LongDefineGlobal, LongGetGlobal,
-                                         Negate, Nil, Not, Print, Pop, Return, SetGlobal, LongSetGlobal, GetLocal, SetLocal, True, Unknown>;
+                                         Negate, Nil, Not, Print, Pop, Return, SetGlobal, LongSetGlobal, GetLocal, SetLocal,
+                                         True, Unknown>;
         InstVariant instruction() const;
         size_t offset() const;
         size_t size() const;

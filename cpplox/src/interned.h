@@ -9,6 +9,7 @@
 namespace lox {
     class InternedString {
     public:
+        InternedString() : InternedString(StringView(nullptr, nullptr)) {}
         InternedString(String str);
         InternedString(StringView sv);
         using UnderlyingString = std::variant<SharedPtr<String>, StringView>;

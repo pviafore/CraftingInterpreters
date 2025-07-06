@@ -40,6 +40,7 @@ namespace lox {
         // keywords
         And,
         Class,
+        Const,
         Else,
         False,
         For,

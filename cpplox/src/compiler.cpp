@@ -216,6 +216,8 @@ namespace lox {
     void Compiler::declaration() {
         if (parser.match(TokenType::Var)) {
             varDeclaration();
+        } else if (parser.match(TokenType::Const)) {
+            constDeclaration();
         } else {
             statement();
         }
@@ -273,20 +275,25 @@ namespace lox {
     }
 
     void Compiler::emitNamedVariable(StringView name, bool canAssign) {
+        bool isConstant = immutables.contains(name);
         OpCode setop = OpCode::SetGlobal;
         OpCode setLongOp = OpCode::LongSetGlobal;
         OpCode getop = OpCode::GetGlobal;
         OpCode getLongOp = OpCode::LongGetGlobal;
-
         auto index = resolveLocal(name);
         if (index.hasValue()) {
             setop = setLongOp = OpCode::SetLocal;
             getop = getLongOp = OpCode::GetLocal;
+            isConstant = locals[index.value()].constant;
         } else {
-            index = addIdentifierConstant(name);
+            index = addIdentifierConstant(name, isConstant);
         }
 
         if (canAssign && parser.match(TokenType::Equal)) {
+            if (isConstant) {
+                parser.errorAtPrevious("Can't re-assign constant");
+                return;
+            }
             expression();
             getCurrentChunk().writeOpAndIndex(setop, setLongOp, index.value(), parser.getPreviousToken().line);
         } else {
@@ -298,7 +305,7 @@ namespace lox {
         for (int index = locals.size() - 1; index >= 0; --index) {
             Local& l = locals[index];
             if (name == l.name) {
-                if (!l.depth.has_value()) {
+                if (!l.depth.hasValue()) {
                     parser.errorAtPrevious("Can't read local variable in own initializer");
                 }
                 return index;
@@ -307,8 +314,8 @@ namespace lox {
         return {};
     }
 
-    void Compiler::varDeclaration() {
-        auto global = parseVariable("Expect variable name");
+    void Compiler::varDeclaration(bool constant) {
+        auto global = parseVariable("Expect variable name", constant);
 
         if (parser.match(TokenType::Equal)) {
             expression();
@@ -320,17 +327,24 @@ namespace lox {
         defineVariable(global);
     }
 
-    size_t Compiler::parseVariable(StringView errorMessage) {
-        parser.consume(TokenType::Identifier, errorMessage);
-        declareVariable();
-        if (depth > 0)
-            return 0;  // don't do a global if we are a local
-        return addIdentifierConstant(parser.getPreviousToken().token);
+    void Compiler::constDeclaration() {
+        varDeclaration(true);
     }
 
-    size_t Compiler::addIdentifierConstant(StringView name) {
-        if (!constants.get(name).has_value()) {
+    size_t Compiler::parseVariable(StringView errorMessage, bool constant) {
+        parser.consume(TokenType::Identifier, errorMessage);
+        declareVariable(constant);
+        if (depth > 0)
+            return 0;  // don't do a global if we are a local
+        return addIdentifierConstant(parser.getPreviousToken().token, constant);
+    }
+
+    size_t Compiler::addIdentifierConstant(StringView name, bool isConstant) {
+        if (!constants.get(name).hasValue()) {
             constants.insert(name, getCurrentChunk().addConstant(name));
+        }
+        if (isConstant) {
+            immutables.insert(name);
         }
         return constants.get(name).value();
     }
@@ -347,13 +361,13 @@ namespace lox {
         locals.back().depth = depth;
     }
 
-    void Compiler::declareVariable() {
+    void Compiler::declareVariable(bool constant) {
         if (depth == 0) {
             return;
         }
 
         for (auto l : views::reversed<decltype(locals)>(locals)) {
-            if (l.depth.has_value() && l.depth.value() < depth) {
+            if (l.depth.hasValue() && l.depth.value() < depth) {
                 break;
             }
 
@@ -362,12 +376,12 @@ namespace lox {
             }
         }
 
-        addLocal(parser.getPreviousToken().token);
+        addLocal(parser.getPreviousToken().token, constant);
     }
 
-    void Compiler::addLocal(StringView name) {
+    void Compiler::addLocal(StringView name, bool constant) {
         try {
-            locals.push_back({name, {}});
+            locals.push_back({name, {}, constant});
         } catch (std::runtime_error&) {
             parser.errorAtCurrent("Too many local variables in function");
         }
