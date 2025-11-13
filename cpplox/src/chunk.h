@@ -20,6 +20,8 @@ namespace lox {
         GetLocal,
         LongGetGlobal,
         Greater,
+        JumpIfFalse,
+        Jump,
         Less,
         Nil,
         Not,
@@ -27,6 +29,7 @@ namespace lox {
         False,
         Divide,
         LongConstant,
+        Loop,
         Multiply,
         Negate,
         Print,
@@ -51,9 +54,12 @@ namespace lox {
     size_t getValueSize();
 
     template <typename T>
+    T readFromBuffer(const std::byte* buffer);
+
+    template <typename T>
     class _OpAndValueInstruction : public _Instruction {
     public:
-        _OpAndValueInstruction(const std::byte* buffer, OpCode opcode, std::string s) : _Instruction(opcode, getValueSize<T>(), s), constantAddress(*reinterpret_cast<const T*>(buffer + 1)) {}
+        _OpAndValueInstruction(const std::byte* buffer, OpCode opcode, std::string s) : _Instruction(opcode, getValueSize<T>(), s), constantAddress(readFromBuffer<T>(buffer + 1)) {}
         T value() const {
             return constantAddress;
         }
@@ -122,6 +128,21 @@ namespace lox {
     public:
         Not() : _Instruction(OpCode::Not, 1, "OP_NOT") {}
     };
+
+    class JumpIfFalse : public _OpAndValueInstruction<uint16_t> {
+    public:
+        JumpIfFalse(const std::byte* buffer) : _OpAndValueInstruction<uint16_t>(buffer, OpCode::JumpIfFalse, "OP_JUMP_IF_FALSE") {}
+    };
+    class Jump : public _OpAndValueInstruction<uint16_t> {
+    public:
+        Jump(const std::byte* buffer) : _OpAndValueInstruction<uint16_t>(buffer, OpCode::Jump, "OP_JUMP") {}
+    };
+
+    class Loop : public _OpAndValueInstruction<uint16_t> {
+    public:
+        Loop(const std::byte* buffer) : _OpAndValueInstruction<uint16_t>(buffer, OpCode::Loop, "OP_LOOP") {}
+    };
+
     class True : public _Instruction {
     public:
         True() : _Instruction(OpCode::True, 1, "OP_TRUE") {}
@@ -232,7 +253,7 @@ namespace lox {
         Instruction& operator=(Instruction&& rhs) = default;
 
         using InstVariant = std::variant<Binary, BinaryPredicate, Constant, DefineGlobal, GetGlobal, Equal, False, LongConstant, LongDefineGlobal, LongGetGlobal,
-                                         Negate, Nil, Not, Print, Pop, Return, SetGlobal, LongSetGlobal, GetLocal, SetLocal,
+                                         Negate, Nil, Not, Print, Pop, Return, SetGlobal, LongSetGlobal, GetLocal, SetLocal, JumpIfFalse, Jump, Loop,
                                          True, Unknown>;
         InstVariant instruction() const;
         size_t offset() const;
@@ -257,6 +278,10 @@ namespace lox {
             // Increment operator (postfix)
             InstructionIterator operator++(int);
 
+            InstructionIterator& operator+=(size_t index);
+
+            void resetBy(int index);
+
             // Inequality operator
             bool operator!=(const InstructionIterator& other) const;
 
@@ -278,6 +303,7 @@ namespace lox {
         void write(lox::OpCode value, size_t line);
         void write(uint8_t value, size_t line);
         void write(std::byte value, size_t line);
+        void writeAt(size_t index, std::byte value);
         void write(size_t value, size_t line);
         void writeConstant(Value value, size_t line);
         void writeOpAndIndex(OpCode small, OpCode large, size_t value, size_t line);
@@ -289,6 +315,7 @@ namespace lox {
         InstructionIterator begin() const;
 
         InstructionIterator end() const;
+        size_t size() const;
 
     private:
         Vector<std::byte> data;

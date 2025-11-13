@@ -12,13 +12,18 @@ namespace lox {
     }
 
     template <typename I>
-    void withValue(std::ostringstream& out, const Chunk& chunk, const I& i) {
+    void withConstant(std::ostringstream& out, const Chunk& chunk, const I& i) {
         out << std::format("{:<32}{}({})", i.name, chunk.getConstant(i.value()), i.value());
     }
 
     template <typename I>
-    void withLocal(std::ostringstream& out, const I& i) {
+    void withRawValue(std::ostringstream& out, const I& i) {
         out << std::format("{:<32}({})", i.name, i.value());
+    }
+
+    template <typename I>
+    void withJump(std::ostringstream& out, const I& i, int32_t offset) {
+        out << std::format("{:<32}({} {})", i.name, i.value(), i.value() + offset);
     }
 
     void disassembleInstruction(const lox::Chunk& chunk, const lox::Instruction& instruction) {
@@ -36,16 +41,19 @@ namespace lox {
         }
         auto inst = instruction.instruction();
         auto overloads = overload{
-            [&out, &chunk, &instruction](Constant& o) { withValue(out, chunk, o); },
-            [&out, &chunk, &instruction](LongConstant& o) { withValue(out, chunk, o); },
-            [&out, &chunk, &instruction](DefineGlobal& o) { withValue(out, chunk, o); },
-            [&out, &chunk, &instruction](LongDefineGlobal& o) { withValue(out, chunk, o); },
-            [&out, &chunk, &instruction](GetGlobal& o) { withValue(out, chunk, o); },
-            [&out, &chunk, &instruction](LongGetGlobal& o) { withValue(out, chunk, o); },
-            [&out, &chunk, &instruction](SetGlobal& o) { withValue(out, chunk, o); },
-            [&out, &chunk, &instruction](LongSetGlobal& o) { withValue(out, chunk, o); },
-            [&out, &chunk, &instruction](GetLocal& o) { withLocal(out, o); },
-            [&out, &chunk, &instruction](SetLocal& o) { withLocal(out, o); },
+            [&out, &chunk, &instruction](Constant& o) { withConstant(out, chunk, o); },
+            [&out, &chunk, &instruction](LongConstant& o) { withConstant(out, chunk, o); },
+            [&out, &chunk, &instruction](DefineGlobal& o) { withConstant(out, chunk, o); },
+            [&out, &chunk, &instruction](LongDefineGlobal& o) { withConstant(out, chunk, o); },
+            [&out, &chunk, &instruction](GetGlobal& o) { withConstant(out, chunk, o); },
+            [&out, &chunk, &instruction](LongGetGlobal& o) { withConstant(out, chunk, o); },
+            [&out, &chunk, &instruction](SetGlobal& o) { withConstant(out, chunk, o); },
+            [&out, &chunk, &instruction](LongSetGlobal& o) { withConstant(out, chunk, o); },
+            [&out, &chunk, &instruction](GetLocal& o) { withRawValue(out, o); },
+            [&out, &chunk, &instruction](SetLocal& o) { withRawValue(out, o); },
+            [&out, &chunk, &instruction](JumpIfFalse& o) { withJump(out, o, instruction.offset()); },
+            [&out, &chunk, &instruction](Jump& o) { withJump(out, o, instruction.offset()); },
+            [&out, &chunk, &instruction](Loop& o) { withJump(out, o, -1 * instruction.offset()); },
             // simple instructions that are just a name
             [&out](auto i) { out << i.name; },
         };

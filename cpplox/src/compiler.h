@@ -54,13 +54,22 @@ namespace lox {
         void binary(bool);
         void ternary(bool);
         void literal(bool);
+        void andOp(bool);
+        void orOp(bool);
 
         void declaration();
         void statement();
         void block();
+
         void beginScope();
         void endScope();
         void printStatement();
+        void ifStatement();
+        void whileStatement();
+        void forStatement();
+        void emitLoop(size_t pos);
+        size_t emitJump(OpCode opCode);
+        void patchJump(size_t pos);
         void expressionStatement();
         void varDeclaration(bool constant = false);
         void constDeclaration();

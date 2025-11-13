@@ -41,6 +41,12 @@ namespace lox {
             return GetLocal(buffer);
         case OpCode::Equal:
             return Equal{};
+        case OpCode::JumpIfFalse:
+            return JumpIfFalse{buffer};
+        case OpCode::Jump:
+            return Jump{buffer};
+        case OpCode::Loop:
+            return Loop{buffer};
         case OpCode::Negate:
             return Negate{};
         case OpCode::Not:
@@ -98,11 +104,31 @@ namespace lox {
         return *this;
     }
 
-    // Increment operator (prefix)
+    // Increment operator (postfix)
     Chunk::InstructionIterator Chunk::InstructionIterator::operator++(int) {
         InstructionIterator tmp = *this;
         ++(*this);
         return tmp;
+    }
+
+    void Chunk::InstructionIterator::resetBy(int index) {
+        current -= index;
+        offset -= index;
+        parsed = false;
+        parseInstruction();
+    }
+
+    Chunk::InstructionIterator& Chunk::InstructionIterator::operator+=(size_t v) {
+        int bytesToRead = v;
+        while (bytesToRead > 0) {
+            bytesToRead -= this->instruction.size();
+            ++*this;
+            parseInstruction();
+        }
+        if (bytesToRead != 0) {
+            throw lox::Exception("Jumping to middle of instruction", nullptr);
+        }
+        return *this;
     }
 
     // Inequality operator
@@ -128,6 +154,14 @@ namespace lox {
 
     void Chunk::write(uint8_t value, size_t line) {
         write(std::byte{value}, line);
+    }
+
+    void Chunk::writeAt(size_t index, std::byte value) {
+        if (index >= data.size()) {
+            throw Exception("Cannot write past chunk", nullptr);
+        }
+
+        data[index] = value;
     }
     void Chunk::write(std::byte value, size_t line) {
         data.push_back(value);
@@ -199,5 +233,21 @@ namespace lox {
 
     template <>
     size_t getValueSize<uint32_t>() { return 4; }
+
+    template <>
+    size_t getValueSize<uint16_t>() { return 3; }
+
+    template <>
+    uint8_t readFromBuffer<uint8_t>(const std::byte* buffer) { return (uint8_t)*buffer; }
+
+    template <>
+    uint16_t readFromBuffer<uint16_t>(const std::byte* buffer) { return ((uint16_t)(*buffer) << 8) + ((uint16_t)*(buffer + 1)); }
+
+    template <>
+    uint32_t readFromBuffer<uint32_t>(const std::byte* buffer) { return ((uint32_t)(*buffer) << 16) + ((uint32_t)(*(buffer + 1)) << 8) + ((uint32_t)*(buffer + 2)); }
+
+    size_t Chunk::size() const {
+        return data.size();
+    }
 
 }

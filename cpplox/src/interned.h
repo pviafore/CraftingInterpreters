@@ -1,6 +1,8 @@
 #ifndef _CPPLOX_INTERNED_H_
 #define _CPPLOX_INTERNED_H_
 
+#include <variant>
+
 #include "algorithm.h"
 #include "string.h"
 

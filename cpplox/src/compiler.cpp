@@ -141,6 +141,24 @@ namespace lox {
         }
     }
 
+    void Compiler::andOp(bool) {
+        auto endJump = emitJump(OpCode::JumpIfFalse);
+        emit(OpCode::Pop);
+        parsePrecedence(Precedence::And);
+        patchJump(endJump);
+    }
+
+    void Compiler::orOp(bool) {
+        auto elseJump = emitJump(OpCode::JumpIfFalse);
+        auto endJump = emitJump(OpCode::Jump);
+
+        patchJump(elseJump);
+        emit(OpCode::Pop);
+        parsePrecedence(Precedence::Or);
+
+        patchJump(endJump);
+    }
+
     void Compiler::ternary(bool) {
         expression();
         parser.consume(TokenType::Colon, "Expected colon between ternary expressions");
@@ -180,6 +198,8 @@ namespace lox {
             {TokenType::GreaterEqual, {nullptr, &Compiler::binary, Precedence::Comparison}},
             {TokenType::Less, {nullptr, &Compiler::binary, Precedence::Comparison}},
             {TokenType::LessEqual, {nullptr, &Compiler::binary, Precedence::Comparison}},
+            {TokenType::And, {nullptr, &Compiler::andOp, Precedence::And}},
+            {TokenType::Or, {nullptr, &Compiler::orOp, Precedence::Or}},
             {TokenType::Identifier, {&Compiler::variable}},
             {TokenType::Number, {&Compiler::number}},
             {TokenType::String, {&Compiler::string}},
@@ -230,6 +250,12 @@ namespace lox {
     void Compiler::statement() {
         if (parser.match(TokenType::Print)) {
             printStatement();
+        } else if (parser.match(TokenType::If)) {
+            ifStatement();
+        } else if (parser.match(TokenType::While)) {
+            whileStatement();
+        } else if (parser.match(TokenType::For)) {
+            forStatement();
         } else if (parser.match(TokenType::LeftBrace)) {
             beginScope();
             block();
@@ -262,6 +288,108 @@ namespace lox {
         expression();
         parser.consume(TokenType::Semicolon, "Expect ';' after value");
         emit(OpCode::Print);
+    }
+
+    void Compiler::ifStatement() {
+        parser.consume(TokenType::LeftParen, "Expect '(' after if )");
+        expression();
+        parser.consume(TokenType::RightParen, "Expect ')' after if condition )");
+        int thenJump = emitJump(OpCode::JumpIfFalse);
+        emit(OpCode::Pop);
+        statement();
+        int elseJump = emitJump(OpCode::Jump);
+        patchJump(thenJump);
+        emit(OpCode::Pop);
+        if (parser.match(TokenType::Else)) {
+            statement();
+        }
+        patchJump(elseJump);
+    }
+
+    void Compiler::whileStatement() {
+        auto loopStart = chunk.size();
+        parser.consume(TokenType::LeftParen, "Expect '(' after while )");
+        expression();
+        parser.consume(TokenType::RightParen, "Expect ')' after while condition )");
+
+        int exitJump = emitJump(OpCode::JumpIfFalse);
+        emit(OpCode::Pop);
+        statement();
+        emitLoop(loopStart);
+
+        patchJump(exitJump);
+        emit(OpCode::Pop);
+    }
+
+    void Compiler::forStatement() {
+        beginScope();
+        parser.consume(TokenType::LeftParen, "Expect (' after 'for'. ");
+        if (parser.match(TokenType::Semicolon)) {
+            // no initializer
+        } else if (parser.match(TokenType::Var)) {
+            varDeclaration();
+        } else {
+            expressionStatement();
+        }
+
+        int loopStart = chunk.size();
+
+        std::optional<size_t> exitJump = std::nullopt;
+        if (!parser.match(TokenType::Semicolon)) {
+            expression();
+            parser.consume(TokenType::Semicolon, "Expect ';' after loop condition");
+            exitJump = emitJump(OpCode::JumpIfFalse);
+            emit(OpCode::Pop);
+        }
+        if (!parser.match(TokenType::RightParen)) {
+            size_t bodyJump = emitJump(OpCode::Jump);
+            size_t incrementStart = chunk.size();
+            expression();
+            emit(OpCode::Pop);
+            parser.consume(TokenType::RightParen, "Expect '}' after for clauses");
+            emitLoop(loopStart);
+            loopStart = incrementStart;
+            patchJump(bodyJump);
+        }
+
+        statement();
+        emitLoop(loopStart);
+
+        if (exitJump.has_value()) {
+            patchJump(exitJump.value());
+            emit(OpCode::Pop);
+        }
+        endScope();
+    }
+
+    void Compiler::emitLoop(size_t pos) {
+        size_t offset = chunk.size() - pos;
+        emit(OpCode::Loop);
+
+        if (offset > std::numeric_limits<uint16_t>::max()) {
+            parser.errorAtPrevious("Loop body too large.");
+        }
+
+        emit((std::byte)(offset >> 8));
+        emit((std::byte)(offset));
+    }
+
+    size_t Compiler::emitJump(OpCode opcode) {
+        emit(opcode);
+        emit((std::byte)0xFF);
+        emit((std::byte)0xFF);
+        return chunk.size() - 2;
+    }
+
+    void Compiler::patchJump(size_t pos) {
+        size_t jump = chunk.size() - pos + 1;
+
+        if (jump > std::numeric_limits<uint16_t>::max()) {
+            parser.errorAtPrevious("Too much code to jump over");
+        }
+
+        chunk.writeAt(pos, (std::byte)(jump >> 8));
+        chunk.writeAt(pos + 1, (std::byte)jump);
     }
 
     void Compiler::expressionStatement() {

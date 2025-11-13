@@ -36,10 +36,11 @@ namespace lox {
                 if (diagnosticMode) {
                     std::println("{}", stack);
                 }
-                auto instruction = *ip++;
+                auto instruction = *ip;
                 if (diagnosticMode) {
                     disassembleInstruction(chunk, instruction);
                 }
+                bool jumped = false;
                 std::visit(
                     overload{
                         [this](const Binary& bin) { binaryOp(bin); },
@@ -56,6 +57,9 @@ namespace lox {
                         [&chunk, &returnCode, this](const LongGetGlobal& g) { returnCode = pushGlobal(chunk, g.value()); },
                         [&chunk, &returnCode, this](const GetLocal& g) { pushLocal(g.value()); },
                         [&chunk, &returnCode, this](const SetLocal& s) { assignLocal(s.value()); },
+                        [&ip, &jumped, this](const JumpIfFalse& j) { if (isFalsey(stack.peek())) { ip += j.value(); jumped = true;} },
+                        [&ip, &jumped, this](const Jump& j) { ip += j.value(); jumped = true; },
+                        [&ip, &jumped, this](const Loop& l) { ip.resetBy(l.value()); jumped = true; },
                         [this](const Negate&) { this->negate(); },
                         [this](const Print&) { std::println("{}", stack.pop()); },
                         [this](const Pop&) { stack.pop(); },
@@ -67,6 +71,10 @@ namespace lox {
                         [this](const True&) { stack.push(true); },
                         [&returnCode](const Unknown&) { returnCode = InterpretResult::CompileError; }},
                     instruction.instruction());
+
+                if (!jumped) {
+                    ip++;
+                }
                 if (returnCode.hasValue() && returnCode.value() != InterpretResult::Ok) {
                     return returnCode.value();
                 }
