@@ -203,16 +203,29 @@ namespace lox {
         switch (*start) {
         case 'a':
             return checkKeyword(1, "nd", TokenType::And);
+        case 'b':
+            return checkKeyword(1, "reak", TokenType::Break);
         case 'c':
             if (ptr - start > 1) {
                 switch (*(start + 1)) {
+                case 'a':
+                    return checkKeyword(2, "se", TokenType::Case);
                 case 'l':
                     return checkKeyword(2, "ass", TokenType::Class);
                 case 'o':
-                    return checkKeyword(2, "nst", TokenType::Const);
+                    if (ptr - start > 2 && *(start + 2) == 'n' && ptr - start > 3) {
+                        switch (*(start + 3)) {
+                        case 's':
+                            return checkKeyword(4, "t", TokenType::Const);
+                        case 't':
+                            return checkKeyword(4, "inue", TokenType::Continue);
+                        }
+                    }
                 }
             }
             break;
+        case 'd':
+            return checkKeyword(1, "efault", TokenType::Default);
         case 'e':
             return checkKeyword(1, "lse", TokenType::Else);
         case 'i':
@@ -220,13 +233,31 @@ namespace lox {
         case 'n':
             return checkKeyword(1, "il", TokenType::Nil);
         case 'o':
+            if (ptr - start > 1) {
+                switch (*(start + 1)) {
+                case 'r':
+                    return checkKeyword(2, "", TokenType::Or);
+                case 'n':
+                    return checkKeyword(2, "ce", TokenType::Once);
+                }
+            }
+            break;
+
             return checkKeyword(1, "r", TokenType::Or);
         case 'p':
             return checkKeyword(1, "rint", TokenType::Print);
         case 'r':
             return checkKeyword(1, "eturn", TokenType::Return);
         case 's':
-            return checkKeyword(1, "uper", TokenType::Super);
+            if (ptr - start > 1) {
+                switch (*(start + 1)) {
+                case 'u':
+                    return checkKeyword(2, "uper", TokenType::Super);
+                case 'w':
+                    return checkKeyword(2, "itch", TokenType::Switch);
+                }
+            }
+            break;
         case 'v':
             return checkKeyword(1, "ar", TokenType::Var);
         case 'w':

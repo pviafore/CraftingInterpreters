@@ -7,8 +7,15 @@
 #include "span.h"
 
 namespace lox {
+    namespace ReservedInternal {
+        const StringView SwitchCondition = "1__SwitchCondition__";
+        const StringView OnceTracker = "2__OnceTracker__";
+    }
     Compiler::Compiler(const String& s) : scanner(s), parser(scanner.begin()) {}
     Optional<Chunk> Compiler::compile() {
+        emitConstant(0.0);  // for onces
+        onceTracker = addLocal(ReservedInternal::OnceTracker, false);
+
         while (!parser.match(TokenType::Eof)) {
             declaration();
         }
@@ -16,6 +23,7 @@ namespace lox {
         auto outChunk = parser.hasError() ? Optional<Chunk>{} : Optional{chunk};
         constants.clear();
         if (outChunk) {
+            outChunk.value().write(OpCode::Pop, parser.getPreviousToken().line);  // for once tracker
             outChunk.value().write(OpCode::Return, parser.getPreviousToken().line);
         }
         if (debugMode && !parser.hasError()) {
@@ -256,6 +264,14 @@ namespace lox {
             whileStatement();
         } else if (parser.match(TokenType::For)) {
             forStatement();
+        } else if (parser.match(TokenType::Switch)) {
+            switchStatement();
+        } else if (parser.match(TokenType::Break)) {
+            breakStatement();
+        } else if (parser.match(TokenType::Continue)) {
+            continueStatement();
+        } else if (parser.match(TokenType::Once)) {
+            onceStatement();
         } else if (parser.match(TokenType::LeftBrace)) {
             beginScope();
             block();
@@ -278,7 +294,7 @@ namespace lox {
     void Compiler::endScope() {
         depth--;
 
-        while (locals.size() > 0 && locals.back().depth != depth) {
+        while (locals.size() > 0 && locals.back().depth > depth) {
             emit(OpCode::Pop);
             locals.pop_back();
         }
@@ -307,6 +323,7 @@ namespace lox {
     }
 
     void Compiler::whileStatement() {
+        nestedLoops.push_back(Loop{depth, chunk.size()});
         auto loopStart = chunk.size();
         parser.consume(TokenType::LeftParen, "Expect '(' after while )");
         expression();
@@ -319,10 +336,15 @@ namespace lox {
 
         patchJump(exitJump);
         emit(OpCode::Pop);
+        for (auto jump : nestedLoops[nestedLoops.size() - 1].breakLocations) {
+            patchJump(jump);
+        }
+        nestedLoops.pop_back();
     }
 
     void Compiler::forStatement() {
         beginScope();
+        nestedLoops.push_back(Loop{depth});
         parser.consume(TokenType::LeftParen, "Expect (' after 'for'. ");
         if (parser.match(TokenType::Semicolon)) {
             // no initializer
@@ -344,6 +366,7 @@ namespace lox {
         if (!parser.match(TokenType::RightParen)) {
             size_t bodyJump = emitJump(OpCode::Jump);
             size_t incrementStart = chunk.size();
+            nestedLoops[nestedLoops.size() - 1].startLocation = incrementStart;
             expression();
             emit(OpCode::Pop);
             parser.consume(TokenType::RightParen, "Expect '}' after for clauses");
@@ -359,7 +382,117 @@ namespace lox {
             patchJump(exitJump.value());
             emit(OpCode::Pop);
         }
+
+        for (auto jump : nestedLoops[nestedLoops.size() - 1].breakLocations) {
+            patchJump(jump);
+        }
+        nestedLoops.pop_back();
         endScope();
+    }
+
+    void Compiler::switchStatement() {
+        beginScope();
+        parser.consume(TokenType::LeftParen, "Expect '(' after 'switch'. ");
+        expression();
+        parser.consume(TokenType::RightParen, "Expect ')' after switch condition )");
+        parser.consume(TokenType::LeftBrace, "Expect '{' after switch condition");
+        auto index = addLocal(ReservedInternal::SwitchCondition, true);
+        getCurrentChunk().writeOpAndIndex(OpCode::SetLocal, OpCode::SetLocal, index, parser.getPreviousToken().line);
+        lox::Optional<size_t> lastJump;
+        lox::Vector<size_t> endOfCaseJumps;
+        while (parser.match(TokenType::Case) || parser.match(TokenType::Default)) {
+            if (lastJump.hasValue()) {
+                emit(OpCode::Pop);
+                patchJump(lastJump.value());
+                lastJump = {};
+            }
+
+            if (parser.getPreviousToken().type == TokenType::Case) {
+                expression();
+                parser.consume(TokenType::Colon, "Expect colon after case statement");
+                getCurrentChunk().writeOpAndIndex(OpCode::GetLocal, OpCode::GetLocal, index, parser.getPreviousToken().line);
+                emit(OpCode::Equal);
+                lastJump = emitJump(OpCode::JumpIfFalse);
+            } else {
+                parser.consume(TokenType::Colon, "Expect colon after default statement");
+            }
+
+            statement();
+            auto endOfCaseJump = emitJump(OpCode::Jump);
+            endOfCaseJumps.push_back(endOfCaseJump);
+        }
+
+        if (lastJump.hasValue()) {
+            emit(OpCode::Pop);
+            patchJump(lastJump.value());
+            lastJump = {};
+        }
+
+        for (auto jump : endOfCaseJumps) {
+            patchJump(jump);
+        }
+
+        parser.consume(TokenType::RightBrace, "Expect '}' after switch cases");
+
+        endScope();
+    }
+
+    void Compiler::breakStatement() {
+        if (nestedLoops.size() == 0) {
+            parser.errorAtPrevious("Break can only be used in a loop");
+            return;
+        }
+        parser.consume(TokenType::Semicolon, "Expect ';' after value");
+
+        int local = locals.size() - 1;
+        while (local >= 0 && locals[local].depth > nestedLoops[nestedLoops.size() - 1].depth) {
+            emit(OpCode::Pop);
+            local--;
+        }
+        auto jump = emitJump(OpCode::Jump);
+        nestedLoops[nestedLoops.size() - 1].breakLocations.push_back(jump);
+    }
+
+    void Compiler::continueStatement() {
+        if (nestedLoops.size() == 0) {
+            parser.errorAtPrevious("Continue can only be used in a loop");
+            return;
+        }
+        parser.consume(TokenType::Semicolon, "Expect ';' after value");
+        int local = locals.size() - 1;
+        while (local >= 0 && locals[local].depth > nestedLoops[nestedLoops.size() - 1].depth) {
+            emit(OpCode::Pop);
+            local--;
+        }
+
+        auto startLoop = nestedLoops[nestedLoops.size() - 1].startLocation;
+        emitLoop(startLoop);
+    }
+
+    void Compiler::onceStatement() {
+        if (numberOfOnces == 64) {
+            parser.errorAtPrevious("Only 64 once statements allowed");
+            return;
+        }
+        numberOfOnces++;
+        uint64_t mask = 1 << numberOfOnces;
+        getCurrentChunk().writeOpAndIndex(OpCode::GetLocal, OpCode::GetLocal, onceTracker, parser.getPreviousToken().line);
+        emitConstant(double(mask));
+        emit(OpCode::BitwiseAnd);
+        emitConstant(double(0));
+        emit(OpCode::Equal);
+        auto jump = emitJump(OpCode::JumpIfFalse);
+        emit(OpCode::Pop);
+        getCurrentChunk().writeOpAndIndex(OpCode::GetLocal, OpCode::GetLocal, onceTracker, parser.getPreviousToken().line);
+        emitConstant(double(mask));
+        emit(OpCode::BitwiseOr);
+        getCurrentChunk().writeOpAndIndex(OpCode::SetLocal, OpCode::SetLocal, onceTracker, parser.getPreviousToken().line);
+        emit(OpCode::Pop);
+        statement();
+        auto thenJump = emitJump(OpCode::Jump);
+        patchJump(jump);
+        emit(OpCode::Pop);
+        patchJump(thenJump);
     }
 
     void Compiler::emitLoop(size_t pos) {
@@ -507,11 +640,12 @@ namespace lox {
         addLocal(parser.getPreviousToken().token, constant);
     }
 
-    void Compiler::addLocal(StringView name, bool constant) {
+    size_t Compiler::addLocal(StringView name, bool constant) {
         try {
             locals.push_back({name, {}, constant});
         } catch (std::runtime_error&) {
             parser.errorAtCurrent("Too many local variables in function");
         }
+        return locals.size() - 1;
     }
 }

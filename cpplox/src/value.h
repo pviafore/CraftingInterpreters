@@ -43,8 +43,8 @@ struct std::formatter<lox::Value> : std::formatter<std::string> {
             overload{
                 [&ctx](nullptr_t) { return "nil"s; },
                 [&ctx](lox::InternedString v) { return "\"" + std::string(v.begin(), v.end()) + "\""; },
-                [&ctx](bool v) { return v ? "true"s : "false"s; },
                 [&ctx](double v) { return std::format("{}", v); },
+                [&ctx](bool v) { return v ? "true"s : "false"s; },
             },
             v);
         return std::formatter<std::string>::format(s, ctx);

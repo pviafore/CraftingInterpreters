@@ -15,6 +15,9 @@ namespace lox {
         case OpCode::Divide:
         case OpCode::Multiply:
         case OpCode::Subtract:
+        case OpCode::BitwiseAnd:
+            return Binary(buffer);
+        case OpCode::BitwiseOr:
             return Binary(buffer);
         case OpCode::Greater:
         case OpCode::Less:

@@ -67,6 +67,10 @@ namespace lox {
         void ifStatement();
         void whileStatement();
         void forStatement();
+        void switchStatement();
+        void breakStatement();
+        void continueStatement();
+        void onceStatement();
         void emitLoop(size_t pos);
         size_t emitJump(OpCode opCode);
         void patchJump(size_t pos);
@@ -81,7 +85,7 @@ namespace lox {
         size_t addIdentifierConstant(StringView name, bool constant);
         void defineVariable(size_t global);
         void declareVariable(bool constant);
-        void addLocal(StringView name, bool constant);
+        size_t addLocal(StringView name, bool constant);
         Optional<size_t> resolveLocal(StringView name);
         void markInitialized();
         Scanner scanner;
@@ -98,6 +102,14 @@ namespace lox {
         StaticVector<Local, 1024> locals;
         size_t localCount = 0;
         size_t depth = 0;
+        size_t onceTracker = 0;
+        size_t numberOfOnces = 0;
+        struct Loop {
+            size_t depth = 0;
+            size_t startLocation = 0;
+            Vector<size_t> breakLocations = {};
+        };
+        Vector<Loop> nestedLoops;
     };
 }
 #endif

@@ -1,5 +1,7 @@
 #ifndef CPPLOX_CHUNK_H_
 #define CPPLOX_CHUNK_H_
+
+#include <cmath>
 #include <functional>
 #include <string>
 #include <utility>
@@ -12,6 +14,8 @@
 namespace lox {
     enum class OpCode : uint8_t {
         Add,
+        BitwiseAnd,
+        BitwiseOr,
         Constant,
         DefineGlobal,
         LongDefineGlobal,
@@ -189,6 +193,10 @@ namespace lox {
             return "OP_LESS";
         case OpCode::Greater:
             return "OP_GREATER";
+        case OpCode::BitwiseAnd:
+            return "OP_BITWISE_AND";
+        case OpCode::BitwiseOr:
+            return "OP_BITWISE_OR";
         default:
             return "Unknown Binary Op";
         }
@@ -206,6 +214,14 @@ namespace lox {
             return std::multiplies<T>();
         case OpCode::Divide:
             return std::divides<T>();
+        case OpCode::BitwiseAnd:
+            return [](T v1, T v2) {
+                return T(uint64_t(round(v1)) & uint64_t(round(v2)));
+            };
+        case OpCode::BitwiseOr:
+            return [](T v1, T v2) {
+                return T(uint64_t(round(v1)) | uint64_t(round(v2)));
+            };
         default:
             throw lox::Exception("Unknown binary operation", nullptr);
         }

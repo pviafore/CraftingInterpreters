@@ -655,3 +655,43 @@ I like the word const for constant. I could see people using final for being abl
 4. Extend clox to allow more than 256 locals
 
 Done by upping static vector's size
+
+# Chapter 23
+
+1. Add a switch case
+
+See clox code, mostly in compiler.cpp's switchStatement
+
+2.  Add break and continue
+
+What I'm realizing is that when I added these to jlox, I probably missed a case. I have to clean up stack whenever I break/continue out of a loop, and that will complicate things. 
+
+So, I think in the compiler, when I hit a break or continue, you need to pop all the local variables that are part of your scope up until the loop. This means that you need to know what loop you are in. So we'll create a stack of loop depths; everytime you loop, you push onto that stack. If you ever have a loop that has break or continue in it, you'd have to patch the jump, so we have to track that for loop scopes as well.
+
+3. Come up with novel control flow. 
+
+I'll be honest, I'm not too good at picking a novel thing.
+
+I thought about `unless`, but that's in Ruby. I thought about a probabilistic switch statement, but that would be better served with a `match`/`dispatch` that so many other languages have. I've thought about parallel branching or recursion, but that needs functions, or threads or other things. Error handling came to mind with panic or exception handlers, but those aren't novel either. I thought about a restart/retry, but that can be expressed as a loop. The problem is with forward and backwards jumps, we are 
+Turing complete, which means that I won't necessarily come up with something that cannot be expressed as a loop or if. The problem is we have to do it more cleanly.
+
+I also don't want to break unstructured control flow in a messy way, since safety is important to me as a programmer and I like keeping guardrails up. 
+
+I think I might do something like this:
+
+```
+for(var i = 0; i < 5; i = i + 1)
+{
+    once {
+        print i;
+    }
+}
+
+```
+
+The `once` statement will have its own block, and it will only ever execute once during the program (The first time its invoked). For the first go around, we will keep program
+state on the stack, and we will have up to 64 onces in a program. Program state will be the first value on the stack throughout the lifetime of the program. 
+
+It will be a compile error if there are more than 64 once statements in a program. 
+
+To do this, we need a once statement, and we need a BitwiseAnd operation (we'll use the program state as a mask and the number of onces are a bitmask)
