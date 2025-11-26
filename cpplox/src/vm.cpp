@@ -112,6 +112,9 @@ namespace lox {
             while (!frames.empty()) {
                 frames.pop();
             }
+            while (!stack.empty()) {
+                stack.pop();
+            }
             return InterpretResult::RuntimeError;
         }
         return InterpretResult::Ok;
