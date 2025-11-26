@@ -1,5 +1,6 @@
 #include "vm.h"
 
+#include <chrono>
 #include <print>
 
 #include "chunk.h"
@@ -8,15 +9,25 @@
 #include "error.h"
 #include "optional.h"
 namespace lox {
+    const size_t FRAMES_MAX = 64;
 
+    Value clockNative(int, Span<Value>) {
+        return double(std::chrono::steady_clock::now().time_since_epoch().count());
+    }
+
+    VM::VM() {
+        defineNative("clock", clockNative);
+    }
     InterpretResult VM::interpret(const String& s) {
         Compiler compiler(s);
         compiler.debugMode = true;
-        auto chunk = compiler.compile();
-        if (!chunk) {
+        auto function = compiler.compile();
+        if (!function) {
             return InterpretResult::CompileError;
         }
-        return run(chunk.value());
+        stack.push(function);
+        call(function, 0);
+        return run();
     }
 
     bool areEqual(Value val1, Value val2) {
@@ -28,11 +39,12 @@ namespace lox {
         return val1 == val2;
     }
 
-    InterpretResult VM::run(const Chunk& chunk) {
-        auto ip = chunk.begin();
+    InterpretResult VM::run() {
         Optional<InterpretResult> returnCode;
         try {
-            while (ip != chunk.end()) {
+            while (!frames.empty() && frames.top().getIp() != frames.top().getFunction()->getChunk()->end()) {
+                const auto& chunk = **frames.top().getFunction()->getChunk();
+                auto& ip = frames.top().getIp();
                 if (diagnosticMode) {
                     std::println("{}", stack);
                 }
@@ -45,8 +57,12 @@ namespace lox {
                     overload{
                         [this](const Binary& bin) { binaryOp(bin); },
                         [this](const BinaryPredicate& bin) {
-                    const auto b = popNumber();
-                    stack.push(bin.getPredicate()(popNumber(), b)); },
+                            const auto b = popNumber();
+                            stack.push(bin.getPredicate()(popNumber(), b));
+                        },
+                        [this, &returnCode](const Call& c) {
+                            callValue(stack.peek(c.value()), c.value());
+                        },
                         [&chunk, this](const Constant& c) { stack.push(chunk.getConstant(c.value())); },
                         [&chunk, this](const LongConstant& c) { stack.push(chunk.getConstant(c.value())); },
                         [&chunk, this](const DefineGlobal& d) { defineGlobal(chunk, d.value()); },
@@ -65,7 +81,16 @@ namespace lox {
                         [this](const Pop&) { stack.pop(); },
                         [this](const Nil&) { stack.push(nullptr); },
                         [this](const Not&) { stack.push(isFalsey(stack.pop())); },
-                        [&returnCode, this](const Return&) {},
+                        [&returnCode, this, &jumped](const Return&) {
+                            auto result = stack.pop();
+                            frames.pop();
+                            if (frames.empty()) {
+                                stack.pop();
+                            } else {
+                                stack.push(result);
+                            }
+                            jumped = true;
+                        },
                         [&chunk, &returnCode, this](const SetGlobal& g) { returnCode = assignGlobal(chunk, g.value()); },
                         [&chunk, &returnCode, this](const LongSetGlobal& g) { returnCode = assignGlobal(chunk, g.value()); },
                         [this](const True&) { stack.push(true); },
@@ -80,7 +105,13 @@ namespace lox {
                 }
             }
         } catch (lox::Exception& e) {
-            std::println(std::cerr, "Error [Line {}] {}", chunk.getLineNumber(ip->offset()), e.what());
+            std::println(std::cerr, "Error: {}", e.what());
+            for (auto f : views::reversed<DynamicStack<CallFrame>>(frames)) {
+                std::println(std::cerr, "[Line {} in {}]", f.getFunction()->getChunk()->getLineNumber(f.getIp()->offset()), f.getFunction()->getName());
+            }
+            while (!frames.empty()) {
+                frames.pop();
+            }
             return InterpretResult::RuntimeError;
         }
         return InterpretResult::Ok;
@@ -159,10 +190,41 @@ namespace lox {
     }
 
     void VM::pushLocal(size_t number) {
-        stack.push(stack[number]);
+        stack.push(frames.top().peek(number));
     }
 
     void VM::assignLocal(size_t number) {
-        stack[number] = stack.peek();
+        frames.top().assign(number, stack.peek());
+    }
+
+    void VM::callValue(Value callee, int argCount) {
+        std::visit(
+            overload{
+                [this, argCount](SharedPtr<Function> func) { call(func, argCount); },
+                [this, argCount](SharedPtr<NativeFunction> func) {
+                    auto result = func->invoke(argCount, Span(stack.begin() + stack.size() - argCount, argCount));
+                    for (auto i = 0; i < argCount; i++) {
+                        stack.pop();  // pop args
+                    }
+                    // pop func
+                    stack.pop();
+                    stack.push(result);
+                },
+                [this](auto) { throw Exception("Can only call functions and classes", nullptr); }},
+            callee);
+    }
+
+    void VM::call(SharedPtr<Function> func, int argCount) {
+        if (argCount != func->getArity()) {
+            throw Exception(std::format("Expected {} arguments but got {}.", func->getArity(), argCount).c_str(), nullptr);
+        }
+        if (frames.size() == FRAMES_MAX) {
+            throw Exception("Stack overflow.", nullptr);
+        }
+        frames.push(CallFrame{func, stack, argCount});
+    }
+
+    void VM::defineNative(StringView name, NativeFunction::Function f) {
+        globals.insert(name, SharedPtr<NativeFunction>::Make(f));
     }
 }

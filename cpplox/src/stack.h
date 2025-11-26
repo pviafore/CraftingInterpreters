@@ -66,6 +66,7 @@ namespace lox {
     class DynamicStack {
     public:
         using value_type = T;
+        using iterator = T*;
 
         void reset() {
             stack.clear();
@@ -77,7 +78,7 @@ namespace lox {
 
         T pop() {
             auto value = top();
-            stack.eraseAt(stack.size() - 1);
+            stack.pop_back();
             return value;
         }
 
@@ -111,6 +112,18 @@ namespace lox {
 
         size_t size() const {
             return stack.size();
+        }
+
+        bool empty() const {
+            return size() == 0;
+        }
+
+        ReverseIterator<T> rbegin() const {
+            return stack.rbegin();
+        }
+
+        ReverseIterator<T> rend() const {
+            return stack.rend();
         }
 
     private:

@@ -16,6 +16,7 @@ namespace lox {
         Add,
         BitwiseAnd,
         BitwiseOr,
+        Call,
         Constant,
         DefineGlobal,
         LongDefineGlobal,
@@ -72,6 +73,10 @@ namespace lox {
         T constantAddress;
     };
 
+    class Call : public _OpAndValueInstruction<uint8_t> {
+    public:
+        Call(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Constant, "OP_CALL") {}
+    };
     class Constant : public _OpAndValueInstruction<uint8_t> {
     public:
         Constant(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Constant, "OP_CONSTANT") {}
@@ -268,7 +273,7 @@ namespace lox {
         Instruction(Instruction&& rhs) = default;
         Instruction& operator=(Instruction&& rhs) = default;
 
-        using InstVariant = std::variant<Binary, BinaryPredicate, Constant, DefineGlobal, GetGlobal, Equal, False, LongConstant, LongDefineGlobal, LongGetGlobal,
+        using InstVariant = std::variant<Binary, BinaryPredicate, Call, Constant, DefineGlobal, GetGlobal, Equal, False, LongConstant, LongDefineGlobal, LongGetGlobal,
                                          Negate, Nil, Not, Print, Pop, Return, SetGlobal, LongSetGlobal, GetLocal, SetLocal, JumpIfFalse, Jump, Loop,
                                          True, Unknown>;
         InstVariant instruction() const;

@@ -83,6 +83,13 @@ namespace lox {
             return this->data[index];
         }
 
+        T& back() {
+            if (count == 0) {
+                throw std::runtime_error("Container is empty");
+            }
+            return this->data[count - 1];
+        }
+
         void clear() {
             if (capacity) {
                 for (size_t i = 0; i < count; ++i) {
@@ -150,6 +157,14 @@ namespace lox {
 
         friend bool operator==(const Vector<T>& lhs, const Vector<T>& rhs) {
             return lhs.count == rhs.count && memcmp(lhs.data, rhs.data, lhs.count * sizeof(T)) == 0;
+        }
+
+        ReverseIterator<T> rbegin() const {
+            return data + count - 1;
+        }
+
+        ReverseIterator<T> rend() const {
+            return data - 1;
         }
 
     private:

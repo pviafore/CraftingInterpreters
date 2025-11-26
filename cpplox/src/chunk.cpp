@@ -22,6 +22,8 @@ namespace lox {
         case OpCode::Greater:
         case OpCode::Less:
             return BinaryPredicate(buffer);
+        case OpCode::Call:
+            return Call(buffer);
         case OpCode::Constant:
             return Constant(buffer);
         case OpCode::LongConstant:

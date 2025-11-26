@@ -10,30 +10,49 @@ namespace lox {
     namespace ReservedInternal {
         const StringView SwitchCondition = "1__SwitchCondition__";
         const StringView OnceTracker = "2__OnceTracker__";
+        const StringView ProgramState = "3__ProgramState__";
     }
-    Compiler::Compiler(const String& s) : scanner(s), parser(scanner.begin()) {}
-    Optional<Chunk> Compiler::compile() {
-        emitConstant(0.0);  // for onces
-        onceTracker = addLocal(ReservedInternal::OnceTracker, false);
 
-        while (!parser.match(TokenType::Eof)) {
+    Compiler::Compiler(const String& s) : scanner(s), parser(SharedPtr<Parser>::Make(scanner.begin())), function(SharedPtr<Function>::Make("<script>")), functionType(FunctionType::SCRIPT) {}
+    Compiler::Compiler(SharedPtr<Parser> parser) : scanner(nullptr), parser(parser), function(SharedPtr<Function>::Make(parser->getPreviousToken().token)), functionType(FunctionType::FUNCTION) {
+    }
+    void Compiler::beginCompile() {
+        addLocal(ReservedInternal::ProgramState, false);  // the function that is being called pushed by VM
+        emitConstant(0.0);                                // for onces
+        onceTracker = addLocal(ReservedInternal::OnceTracker, false);
+        getCurrentChunk()->writeOpAndIndex(OpCode::SetLocal, OpCode::SetLocal, onceTracker, parser->getPreviousToken().line);
+    }
+    SharedPtr<Function> Compiler::compile() {
+        beginCompile();
+        while (!parser->match(TokenType::Eof)) {
             declaration();
         }
-        parser.consume(TokenType::Eof, "Expect end of expression");
-        auto outChunk = parser.hasError() ? Optional<Chunk>{} : Optional{chunk};
+        parser->consume(TokenType::Eof, "Expect end of expression");
+        return endCompile();
+    }
+
+    SharedPtr<Function> Compiler::endCompile() {
         constants.clear();
-        if (outChunk) {
-            outChunk.value().write(OpCode::Pop, parser.getPreviousToken().line);  // for once tracker
-            outChunk.value().write(OpCode::Return, parser.getPreviousToken().line);
+        if (parser->hasError() || !function) {
+            return nullptr;
         }
-        if (debugMode && !parser.hasError()) {
-            std::println("{}", outChunk.value());
+
+        function->getChunk()->write(OpCode::Pop, parser->getPreviousToken().line);  // for once tracker
+        emitReturn();
+        if (debugMode && !parser->hasError()) {
+            std::println("{}\n{}", function->getName(), **(function->getChunk()));
         }
-        return outChunk;
+
+        return function;
+    }
+
+    void Compiler::emitReturn() {
+        emit(OpCode::Nil);
+        function->getChunk()->write(OpCode::Return, parser->getPreviousToken().line);
     }
 
     void Compiler::emit(std::byte byte) {
-        getCurrentChunk().write(byte, parser.getPreviousToken().line);
+        getCurrentChunk()->write(byte, parser->getPreviousToken().line);
     }
 
     void Compiler::emit(OpCode b1, std::byte b2) {
@@ -45,36 +64,36 @@ namespace lox {
         emit(std::byte{std::to_underlying(b1)});
     }
 
-    Chunk& Compiler::getCurrentChunk() {
-        return chunk;
+    SharedPtr<Chunk> Compiler::getCurrentChunk() {
+        return function->getChunk();
     }
 
     void Compiler::number(bool) {
-        auto& token = parser.getPreviousToken();
+        auto& token = parser->getPreviousToken();
         double value = strtod(token.token.begin(), nullptr);
         emitConstant(value);
     }
 
     void Compiler::string(bool) {
-        auto token = parser.getPreviousToken().token;
+        auto token = parser->getPreviousToken().token;
         auto s = StringView(token.begin() + 1, token.end() - 1);
         emitConstant(s);
     }
 
     void Compiler::emitConstant(Value value) {
         try {
-            getCurrentChunk().writeConstant(value, previousLine());
+            getCurrentChunk()->writeConstant(value, previousLine());
         } catch (lox::Exception& e) {
-            parser.errorAtPrevious(e.what().c_str());
+            parser->errorAtPrevious(e.what().c_str());
         }
     }
 
     void Compiler::emit(size_t value) {
-        return getCurrentChunk().write(value, previousLine());
+        return getCurrentChunk()->write(value, previousLine());
     }
 
     size_t Compiler::previousLine() const {
-        return parser.getPreviousToken().line;
+        return parser->getPreviousToken().line;
     }
 
     void Compiler::expression() {
@@ -83,11 +102,32 @@ namespace lox {
 
     void Compiler::grouping(bool) {
         expression();
-        parser.consume(TokenType::RightParen, "Expect ')' after parentheses");
+        parser->consume(TokenType::RightParen, "Expect ')' after parentheses");
+    }
+
+    void Compiler::call(bool) {
+        uint8_t argCount = argumentList();
+        emit(OpCode::Call);
+        emit(argCount);
+    }
+
+    uint8_t Compiler::argumentList() {
+        uint8_t argCount = 0;
+        if (!parser->check(TokenType::RightParen)) {
+            do {
+                expression();
+                if (argCount == 255) {
+                    parser->errorAtPrevious("Cannot have more than 255 arguments");
+                }
+                argCount++;
+            } while (parser->match(TokenType::Comma));
+        }
+        parser->consume(TokenType::RightParen, "Expect ')' after arguments.");
+        return argCount;
     }
 
     void Compiler::unary(bool) {
-        Token previous = parser.getPreviousToken();
+        Token previous = parser->getPreviousToken();
 
         parsePrecedence(Precedence::Unary);
         switch (previous.type) {
@@ -107,7 +147,7 @@ namespace lox {
     }
 
     void Compiler::binary(bool) {
-        TokenType operatorType = parser.getPreviousToken().type;
+        TokenType operatorType = parser->getPreviousToken().type;
         auto rule = getRule(operatorType);
         parsePrecedence(nextPrecedence(rule.precedence));
         switch (operatorType) {
@@ -169,13 +209,13 @@ namespace lox {
 
     void Compiler::ternary(bool) {
         expression();
-        parser.consume(TokenType::Colon, "Expected colon between ternary expressions");
+        parser->consume(TokenType::Colon, "Expected colon between ternary expressions");
         expression();
         // this will emit the code for expressions, but what do we do to jump between them?
     }
 
     void Compiler::literal(bool) {
-        switch (parser.getPreviousToken().type) {
+        switch (parser->getPreviousToken().type) {
         case TokenType::False:
             emit(OpCode::False);
             break;
@@ -194,7 +234,7 @@ namespace lox {
     const Compiler::ParseRule& Compiler::getRule(TokenType type) const {
         const static ParseRule empty{};
         const static std::unordered_map<TokenType, ParseRule> rules{
-            {TokenType::LeftParen, {&Compiler::grouping}},
+            {TokenType::LeftParen, {&Compiler::grouping, &Compiler::call, Precedence::Call}},
             {TokenType::Minus, {&Compiler::unary, &Compiler::binary, Precedence::Term}},
             {TokenType::Plus, {{}, &Compiler::binary, Precedence::Term}},
             {TokenType::Slash, {{}, &Compiler::binary, Precedence::Factor}},
@@ -221,58 +261,62 @@ namespace lox {
     }
 
     void Compiler::parsePrecedence(Precedence precedence) {
-        auto& previous = parser.advance();
+        auto& previous = parser->advance();
         auto prefixRule = getRule(previous.type).prefix;
         if (!prefixRule) {
-            parser.errorAtPrevious("Expect expression.");
+            parser->errorAtPrevious("Expect expression.");
             return;
         }
         bool canAssign = precedence <= Precedence::Assignment;
         std::invoke(prefixRule, this, canAssign);
 
-        while (precedence <= getRule(parser.getCurrentToken().type).precedence) {
-            previous = parser.advance();
+        while (precedence <= getRule(parser->getCurrentToken().type).precedence) {
+            previous = parser->advance();
             auto infixRule = getRule(previous.type).infix;
             std::invoke(infixRule, this, canAssign);
         }
 
-        if (canAssign && parser.match(TokenType::Equal)) {
-            parser.errorAtPrevious("Invalid assignment target");
+        if (canAssign && parser->match(TokenType::Equal)) {
+            parser->errorAtPrevious("Invalid assignment target");
         }
     }
 
     void Compiler::declaration() {
-        if (parser.match(TokenType::Var)) {
+        if (parser->match(TokenType::Var)) {
             varDeclaration();
-        } else if (parser.match(TokenType::Const)) {
+        } else if (parser->match(TokenType::Const)) {
             constDeclaration();
+        } else if (parser->match(TokenType::Fun)) {
+            funDeclaration();
         } else {
             statement();
         }
 
-        if (parser.inPanicMode()) {
-            parser.synchronize();
+        if (parser->inPanicMode()) {
+            parser->synchronize();
         }
     }
 
     void Compiler::statement() {
-        if (parser.match(TokenType::Print)) {
+        if (parser->match(TokenType::Print)) {
             printStatement();
-        } else if (parser.match(TokenType::If)) {
+        } else if (parser->match(TokenType::If)) {
             ifStatement();
-        } else if (parser.match(TokenType::While)) {
+        } else if (parser->match(TokenType::While)) {
             whileStatement();
-        } else if (parser.match(TokenType::For)) {
+        } else if (parser->match(TokenType::For)) {
             forStatement();
-        } else if (parser.match(TokenType::Switch)) {
+        } else if (parser->match(TokenType::Switch)) {
             switchStatement();
-        } else if (parser.match(TokenType::Break)) {
+        } else if (parser->match(TokenType::Break)) {
             breakStatement();
-        } else if (parser.match(TokenType::Continue)) {
+        } else if (parser->match(TokenType::Continue)) {
             continueStatement();
-        } else if (parser.match(TokenType::Once)) {
+        } else if (parser->match(TokenType::Once)) {
             onceStatement();
-        } else if (parser.match(TokenType::LeftBrace)) {
+        } else if (parser->match(TokenType::Return)) {
+            returnStatement();
+        } else if (parser->match(TokenType::LeftBrace)) {
             beginScope();
             block();
             endScope();
@@ -282,10 +326,10 @@ namespace lox {
     }
 
     void Compiler::block() {
-        while (!parser.check(TokenType::RightBrace) && !parser.check(TokenType::Eof)) {
+        while (!parser->check(TokenType::RightBrace) && !parser->check(TokenType::Eof)) {
             declaration();
         }
-        parser.consume(TokenType::RightBrace, "Expect '}' after block.");
+        parser->consume(TokenType::RightBrace, "Expect '}' after block.");
     }
 
     void Compiler::beginScope() {
@@ -302,32 +346,32 @@ namespace lox {
 
     void Compiler::printStatement() {
         expression();
-        parser.consume(TokenType::Semicolon, "Expect ';' after value");
+        parser->consume(TokenType::Semicolon, "Expect ';' after value");
         emit(OpCode::Print);
     }
 
     void Compiler::ifStatement() {
-        parser.consume(TokenType::LeftParen, "Expect '(' after if )");
+        parser->consume(TokenType::LeftParen, "Expect '(' after if )");
         expression();
-        parser.consume(TokenType::RightParen, "Expect ')' after if condition )");
+        parser->consume(TokenType::RightParen, "Expect ')' after if condition )");
         int thenJump = emitJump(OpCode::JumpIfFalse);
         emit(OpCode::Pop);
         statement();
         int elseJump = emitJump(OpCode::Jump);
         patchJump(thenJump);
         emit(OpCode::Pop);
-        if (parser.match(TokenType::Else)) {
+        if (parser->match(TokenType::Else)) {
             statement();
         }
         patchJump(elseJump);
     }
 
     void Compiler::whileStatement() {
-        nestedLoops.push_back(Loop{depth, chunk.size()});
-        auto loopStart = chunk.size();
-        parser.consume(TokenType::LeftParen, "Expect '(' after while )");
+        nestedLoops.push_back(Loop{depth, getCurrentChunk()->size()});
+        auto loopStart = getCurrentChunk()->size();
+        parser->consume(TokenType::LeftParen, "Expect '(' after while )");
         expression();
-        parser.consume(TokenType::RightParen, "Expect ')' after while condition )");
+        parser->consume(TokenType::RightParen, "Expect ')' after while condition )");
 
         int exitJump = emitJump(OpCode::JumpIfFalse);
         emit(OpCode::Pop);
@@ -345,31 +389,31 @@ namespace lox {
     void Compiler::forStatement() {
         beginScope();
         nestedLoops.push_back(Loop{depth});
-        parser.consume(TokenType::LeftParen, "Expect (' after 'for'. ");
-        if (parser.match(TokenType::Semicolon)) {
+        parser->consume(TokenType::LeftParen, "Expect (' after 'for'. ");
+        if (parser->match(TokenType::Semicolon)) {
             // no initializer
-        } else if (parser.match(TokenType::Var)) {
+        } else if (parser->match(TokenType::Var)) {
             varDeclaration();
         } else {
             expressionStatement();
         }
 
-        int loopStart = chunk.size();
+        int loopStart = getCurrentChunk()->size();
 
         std::optional<size_t> exitJump = std::nullopt;
-        if (!parser.match(TokenType::Semicolon)) {
+        if (!parser->match(TokenType::Semicolon)) {
             expression();
-            parser.consume(TokenType::Semicolon, "Expect ';' after loop condition");
+            parser->consume(TokenType::Semicolon, "Expect ';' after loop condition");
             exitJump = emitJump(OpCode::JumpIfFalse);
             emit(OpCode::Pop);
         }
-        if (!parser.match(TokenType::RightParen)) {
+        if (!parser->match(TokenType::RightParen)) {
             size_t bodyJump = emitJump(OpCode::Jump);
-            size_t incrementStart = chunk.size();
+            size_t incrementStart = getCurrentChunk()->size();
             nestedLoops[nestedLoops.size() - 1].startLocation = incrementStart;
             expression();
             emit(OpCode::Pop);
-            parser.consume(TokenType::RightParen, "Expect '}' after for clauses");
+            parser->consume(TokenType::RightParen, "Expect '}' after for clauses");
             emitLoop(loopStart);
             loopStart = incrementStart;
             patchJump(bodyJump);
@@ -392,29 +436,29 @@ namespace lox {
 
     void Compiler::switchStatement() {
         beginScope();
-        parser.consume(TokenType::LeftParen, "Expect '(' after 'switch'. ");
+        parser->consume(TokenType::LeftParen, "Expect '(' after 'switch'. ");
         expression();
-        parser.consume(TokenType::RightParen, "Expect ')' after switch condition )");
-        parser.consume(TokenType::LeftBrace, "Expect '{' after switch condition");
+        parser->consume(TokenType::RightParen, "Expect ')' after switch condition )");
+        parser->consume(TokenType::LeftBrace, "Expect '{' after switch condition");
         auto index = addLocal(ReservedInternal::SwitchCondition, true);
-        getCurrentChunk().writeOpAndIndex(OpCode::SetLocal, OpCode::SetLocal, index, parser.getPreviousToken().line);
+        getCurrentChunk()->writeOpAndIndex(OpCode::SetLocal, OpCode::SetLocal, index, parser->getPreviousToken().line);
         lox::Optional<size_t> lastJump;
         lox::Vector<size_t> endOfCaseJumps;
-        while (parser.match(TokenType::Case) || parser.match(TokenType::Default)) {
+        while (parser->match(TokenType::Case) || parser->match(TokenType::Default)) {
             if (lastJump.hasValue()) {
                 emit(OpCode::Pop);
                 patchJump(lastJump.value());
                 lastJump = {};
             }
 
-            if (parser.getPreviousToken().type == TokenType::Case) {
+            if (parser->getPreviousToken().type == TokenType::Case) {
                 expression();
-                parser.consume(TokenType::Colon, "Expect colon after case statement");
-                getCurrentChunk().writeOpAndIndex(OpCode::GetLocal, OpCode::GetLocal, index, parser.getPreviousToken().line);
+                parser->consume(TokenType::Colon, "Expect colon after case statement");
+                getCurrentChunk()->writeOpAndIndex(OpCode::GetLocal, OpCode::GetLocal, index, parser->getPreviousToken().line);
                 emit(OpCode::Equal);
                 lastJump = emitJump(OpCode::JumpIfFalse);
             } else {
-                parser.consume(TokenType::Colon, "Expect colon after default statement");
+                parser->consume(TokenType::Colon, "Expect colon after default statement");
             }
 
             statement();
@@ -432,17 +476,17 @@ namespace lox {
             patchJump(jump);
         }
 
-        parser.consume(TokenType::RightBrace, "Expect '}' after switch cases");
+        parser->consume(TokenType::RightBrace, "Expect '}' after switch cases");
 
         endScope();
     }
 
     void Compiler::breakStatement() {
         if (nestedLoops.size() == 0) {
-            parser.errorAtPrevious("Break can only be used in a loop");
+            parser->errorAtPrevious("Break can only be used in a loop");
             return;
         }
-        parser.consume(TokenType::Semicolon, "Expect ';' after value");
+        parser->consume(TokenType::Semicolon, "Expect ';' after value");
 
         int local = locals.size() - 1;
         while (local >= 0 && locals[local].depth > nestedLoops[nestedLoops.size() - 1].depth) {
@@ -455,10 +499,10 @@ namespace lox {
 
     void Compiler::continueStatement() {
         if (nestedLoops.size() == 0) {
-            parser.errorAtPrevious("Continue can only be used in a loop");
+            parser->errorAtPrevious("Continue can only be used in a loop");
             return;
         }
-        parser.consume(TokenType::Semicolon, "Expect ';' after value");
+        parser->consume(TokenType::Semicolon, "Expect ';' after value");
         int local = locals.size() - 1;
         while (local >= 0 && locals[local].depth > nestedLoops[nestedLoops.size() - 1].depth) {
             emit(OpCode::Pop);
@@ -471,22 +515,22 @@ namespace lox {
 
     void Compiler::onceStatement() {
         if (numberOfOnces == 64) {
-            parser.errorAtPrevious("Only 64 once statements allowed");
+            parser->errorAtPrevious("Only 64 once statements allowed");
             return;
         }
         numberOfOnces++;
         uint64_t mask = 1 << numberOfOnces;
-        getCurrentChunk().writeOpAndIndex(OpCode::GetLocal, OpCode::GetLocal, onceTracker, parser.getPreviousToken().line);
+        getCurrentChunk()->writeOpAndIndex(OpCode::GetLocal, OpCode::GetLocal, onceTracker, parser->getPreviousToken().line);
         emitConstant(double(mask));
         emit(OpCode::BitwiseAnd);
         emitConstant(double(0));
         emit(OpCode::Equal);
         auto jump = emitJump(OpCode::JumpIfFalse);
         emit(OpCode::Pop);
-        getCurrentChunk().writeOpAndIndex(OpCode::GetLocal, OpCode::GetLocal, onceTracker, parser.getPreviousToken().line);
+        getCurrentChunk()->writeOpAndIndex(OpCode::GetLocal, OpCode::GetLocal, onceTracker, parser->getPreviousToken().line);
         emitConstant(double(mask));
         emit(OpCode::BitwiseOr);
-        getCurrentChunk().writeOpAndIndex(OpCode::SetLocal, OpCode::SetLocal, onceTracker, parser.getPreviousToken().line);
+        getCurrentChunk()->writeOpAndIndex(OpCode::SetLocal, OpCode::SetLocal, onceTracker, parser->getPreviousToken().line);
         emit(OpCode::Pop);
         statement();
         auto thenJump = emitJump(OpCode::Jump);
@@ -495,12 +539,25 @@ namespace lox {
         patchJump(thenJump);
     }
 
+    void Compiler::returnStatement() {
+        if (functionType == FunctionType::SCRIPT) {
+            throw Exception("Cannot return from top-level code", nullptr);
+        }
+        if (parser->match(TokenType::Semicolon)) {
+            emitReturn();
+        } else {
+            expression();
+            parser->consume(TokenType::Semicolon, "Expected semicolon after return value");
+            emit(OpCode::Return);
+        }
+    }
+
     void Compiler::emitLoop(size_t pos) {
-        size_t offset = chunk.size() - pos;
+        size_t offset = getCurrentChunk()->size() - pos;
         emit(OpCode::Loop);
 
         if (offset > std::numeric_limits<uint16_t>::max()) {
-            parser.errorAtPrevious("Loop body too large.");
+            parser->errorAtPrevious("Loop body too large.");
         }
 
         emit((std::byte)(offset >> 8));
@@ -511,28 +568,28 @@ namespace lox {
         emit(opcode);
         emit((std::byte)0xFF);
         emit((std::byte)0xFF);
-        return chunk.size() - 2;
+        return getCurrentChunk()->size() - 2;
     }
 
     void Compiler::patchJump(size_t pos) {
-        size_t jump = chunk.size() - pos + 1;
+        size_t jump = getCurrentChunk()->size() - pos + 1;
 
         if (jump > std::numeric_limits<uint16_t>::max()) {
-            parser.errorAtPrevious("Too much code to jump over");
+            parser->errorAtPrevious("Too much code to jump over");
         }
 
-        chunk.writeAt(pos, (std::byte)(jump >> 8));
-        chunk.writeAt(pos + 1, (std::byte)jump);
+        getCurrentChunk()->writeAt(pos, (std::byte)(jump >> 8));
+        getCurrentChunk()->writeAt(pos + 1, (std::byte)jump);
     }
 
     void Compiler::expressionStatement() {
         expression();
-        parser.consume(TokenType::Semicolon, "Expect ';' after expression");
+        parser->consume(TokenType::Semicolon, "Expect ';' after expression");
         emit(OpCode::Pop);
     }
 
     void Compiler::variable(bool canAssign) {
-        emitNamedVariable(parser.getPreviousToken().token, canAssign);
+        emitNamedVariable(parser->getPreviousToken().token, canAssign);
     }
 
     void Compiler::emitNamedVariable(StringView name, bool canAssign) {
@@ -550,15 +607,15 @@ namespace lox {
             index = addIdentifierConstant(name, isConstant);
         }
 
-        if (canAssign && parser.match(TokenType::Equal)) {
+        if (canAssign && parser->match(TokenType::Equal)) {
             if (isConstant) {
-                parser.errorAtPrevious("Can't re-assign constant");
+                parser->errorAtPrevious("Can't re-assign constant");
                 return;
             }
             expression();
-            getCurrentChunk().writeOpAndIndex(setop, setLongOp, index.value(), parser.getPreviousToken().line);
+            getCurrentChunk()->writeOpAndIndex(setop, setLongOp, index.value(), parser->getPreviousToken().line);
         } else {
-            getCurrentChunk().writeOpAndIndex(getop, getLongOp, index.value(), parser.getPreviousToken().line);
+            getCurrentChunk()->writeOpAndIndex(getop, getLongOp, index.value(), parser->getPreviousToken().line);
         }
     }
 
@@ -567,7 +624,7 @@ namespace lox {
             Local& l = locals[index];
             if (name == l.name) {
                 if (!l.depth.hasValue()) {
-                    parser.errorAtPrevious("Can't read local variable in own initializer");
+                    parser->errorAtPrevious("Can't read local variable in own initializer");
                 }
                 return index;
             }
@@ -578,13 +635,13 @@ namespace lox {
     void Compiler::varDeclaration(bool constant) {
         auto global = parseVariable("Expect variable name", constant);
 
-        if (parser.match(TokenType::Equal)) {
+        if (parser->match(TokenType::Equal)) {
             expression();
         } else {
             emit(OpCode::Nil);
         }
 
-        parser.consume(TokenType::Semicolon, "Expect ';' after variable declaration.");
+        parser->consume(TokenType::Semicolon, "Expect ';' after variable declaration.");
         defineVariable(global);
     }
 
@@ -592,17 +649,44 @@ namespace lox {
         varDeclaration(true);
     }
 
+    void Compiler::funDeclaration() {
+        size_t global = parseVariable("Expect function name. ", false);
+        markInitialized();
+        func(FunctionType::FUNCTION);
+        defineVariable(global);
+    }
+
+    void Compiler::func(FunctionType) {
+        Compiler compiler(parser);
+        compiler.beginCompile();
+        compiler.beginScope();
+        parser->consume(TokenType::LeftParen, "Expect '(' after function name");
+        if (!parser->check(TokenType::RightParen)) {
+            do {
+                function->increaseArity();
+                size_t constant = compiler.parseVariable("Expect parameter name", true);
+                compiler.defineVariable(constant);
+            } while (parser->match(TokenType::Comma));
+        }
+        parser->consume(TokenType::RightParen, "Expect ')' after parameters");
+        parser->consume(TokenType::LeftBrace, "Expect '{' before function body");
+        compiler.block();
+
+        auto function = compiler.endCompile();
+        emitConstant(function);
+    }
+
     size_t Compiler::parseVariable(StringView errorMessage, bool constant) {
-        parser.consume(TokenType::Identifier, errorMessage);
+        parser->consume(TokenType::Identifier, errorMessage);
         declareVariable(constant);
         if (depth > 0)
             return 0;  // don't do a global if we are a local
-        return addIdentifierConstant(parser.getPreviousToken().token, constant);
+        return addIdentifierConstant(parser->getPreviousToken().token, constant);
     }
 
     size_t Compiler::addIdentifierConstant(StringView name, bool isConstant) {
         if (!constants.get(name).hasValue()) {
-            constants.insert(name, getCurrentChunk().addConstant(name));
+            constants.insert(name, getCurrentChunk()->addConstant(name));
         }
         if (isConstant) {
             immutables.insert(name);
@@ -615,10 +699,13 @@ namespace lox {
             markInitialized();
             return;
         }
-        getCurrentChunk().writeOpAndIndex(OpCode::DefineGlobal, OpCode::LongDefineGlobal, global, parser.getPreviousToken().line);
+        getCurrentChunk()->writeOpAndIndex(OpCode::DefineGlobal, OpCode::LongDefineGlobal, global, parser->getPreviousToken().line);
     }
 
     void Compiler::markInitialized() {
+        if (depth == 0) {
+            return;
+        }
         locals.back().depth = depth;
     }
 
@@ -632,19 +719,19 @@ namespace lox {
                 break;
             }
 
-            if (l.name == parser.getPreviousToken().token) {
-                parser.errorAtPrevious("Already a variable with this name in scope");
+            if (l.name == parser->getPreviousToken().token) {
+                parser->errorAtPrevious("Already a variable with this name in scope");
             }
         }
 
-        addLocal(parser.getPreviousToken().token, constant);
+        addLocal(parser->getPreviousToken().token, constant);
     }
 
     size_t Compiler::addLocal(StringView name, bool constant) {
         try {
             locals.push_back({name, {}, constant});
         } catch (std::runtime_error&) {
-            parser.errorAtCurrent("Too many local variables in function");
+            parser->errorAtCurrent("Too many local variables in function");
         }
         return locals.size() - 1;
     }

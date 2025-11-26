@@ -41,6 +41,7 @@ namespace lox {
         }
         auto inst = instruction.instruction();
         auto overloads = overload{
+            [&out, &chunk, &instruction](Call& o) { withConstant(out, chunk, o); },
             [&out, &chunk, &instruction](Constant& o) { withConstant(out, chunk, o); },
             [&out, &chunk, &instruction](LongConstant& o) { withConstant(out, chunk, o); },
             [&out, &chunk, &instruction](DefineGlobal& o) { withConstant(out, chunk, o); },

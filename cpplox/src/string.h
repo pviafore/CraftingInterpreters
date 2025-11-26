@@ -18,7 +18,7 @@ namespace lox {
             buffer.push_back(0);
             hashString();
         }
-        String(const char* data) : String(data, strlen(data)) {
+        String(const char* data) : String(data, data ? strlen(data) : 0) {
         }
 
         String(const char* data, size_t length) {

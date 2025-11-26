@@ -10,8 +10,23 @@
 #include "span.h"
 namespace lox {
 
+    class NativeFunction;
     // span is used for a "constant" string
-    using Value = std::variant<bool, std::nullptr_t, double, InternedString>;
+    using Value = std::variant<bool, std::nullptr_t, double, InternedString, SharedPtr<Function>, SharedPtr<NativeFunction>>;
+
+    class NativeFunction {
+    public:
+        using Function = std::function<Value(int, Span<Value>)>;
+        NativeFunction(Function f);
+        Value invoke(int argCount, Span<Value> values);
+
+        friend bool operator==(const NativeFunction& f1, const NativeFunction& f2) {
+            return f1.function == f2.function;
+        }
+
+    private:
+        Function function;
+    };
 
     inline bool isFalsey(Value value) {
         return std::holds_alternative<nullptr_t>(value) || (std::holds_alternative<bool>(value) && !std::get<bool>(value));
@@ -22,6 +37,9 @@ namespace lox {
     }
     inline bool isString(Value value) {
         return std::holds_alternative<InternedString>(value);
+    }
+    inline bool isFunction(Value value) {
+        return std::holds_alternative<SharedPtr<Function>>(value);
     }
 }
 
@@ -45,7 +63,8 @@ struct std::formatter<lox::Value> : std::formatter<std::string> {
                 [&ctx](lox::InternedString v) { return "\"" + std::string(v.begin(), v.end()) + "\""; },
                 [&ctx](double v) { return std::format("{}", v); },
                 [&ctx](bool v) { return v ? "true"s : "false"s; },
-            },
+                [&ctx](lox::SharedPtr<lox::Function> f) { return std::string(f->getName().str().c_str()); },
+                [&ctx](lox::SharedPtr<lox::NativeFunction>) { return "<native fn>"s; }},
             v);
         return std::formatter<std::string>::format(s, ctx);
     }

@@ -69,6 +69,43 @@ namespace lox {
     }
 
     template <typename T>
+    class UniquePtr {
+    public:
+        UniquePtr() {}
+        UniquePtr(T* inPtr) {
+            ptr = inPtr;
+        }
+
+        ~UniquePtr() {
+            deallocate<T>(ptr);
+        }
+        template <typename... Args>
+        static UniquePtr<T> Make(Args&&... args) {
+            T* ptr = allocate<T>();
+            std::construct_at(ptr, std::forward<Args>(args)...);
+            return UniquePtr(ptr);
+        }
+
+        UniquePtr<T>& operator=(const UniquePtr<T>&) = delete;
+        UniquePtr(const UniquePtr<T>&) = delete;
+        UniquePtr<T>& operator=(UniquePtr<T>&& rhs) {
+            if (rhs.ptr != ptr) {
+                deallocate<T>(ptr);
+                ptr = rhs.ptr;
+                rhs.ptr = nullptr;
+            }
+            return *this;
+        }
+        UniquePtr(UniquePtr<T>&& rhs) {
+            ptr = rhs.ptr;
+            rhs.ptr = nullptr;
+        }
+
+    private:
+        T* ptr;
+    };
+
+    template <typename T>
     class SharedPtr {
     public:
         SharedPtr() {}
@@ -121,6 +158,10 @@ namespace lox {
             return this->ctrlBlock != nullptr ? this->ctrlBlock->get() : nullptr;
         }
 
+        operator bool() const {
+            return ctrlBlock && ctrlBlock->get() != nullptr;
+        }
+
         ~SharedPtr() {
             if (ctrlBlock) {
                 ctrlBlock->decrementRef();
@@ -145,8 +186,10 @@ namespace lox {
             }
             void decrementRef() {
                 if (refCount.fetch_sub(1) == 1) {
-                    std::destroy_at(rawPtr);
-                    deallocate(rawPtr);
+                    if (rawPtr) {
+                        std::destroy_at(rawPtr);
+                        deallocate(rawPtr);
+                    }
                     deallocate<ControlBlock>(this);
                 }
             }

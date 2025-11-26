@@ -27,11 +27,17 @@ namespace lox {
     };
     class Compiler {
     public:
+        enum FunctionType {
+            FUNCTION,
+            SCRIPT
+        };
+
         Compiler(const String& s);
-        Optional<Chunk> compile();
+        SharedPtr<Function> compile();
         bool debugMode = false;
 
     private:
+        Compiler(SharedPtr<Parser> parser);
         using ParseFn = std::function<void(Compiler*, bool)>;
         struct ParseRule {
             ParseFn prefix{};
@@ -39,7 +45,7 @@ namespace lox {
             Precedence precedence = Precedence::None;
         };
 
-        Chunk& getCurrentChunk();
+        SharedPtr<Chunk> getCurrentChunk();
         void emit(std::byte byte);
         void emit(OpCode b1, std::byte b2);
         void emit(OpCode b1);
@@ -56,6 +62,8 @@ namespace lox {
         void literal(bool);
         void andOp(bool);
         void orOp(bool);
+        void call(bool);
+        uint8_t argumentList();
 
         void declaration();
         void statement();
@@ -71,13 +79,17 @@ namespace lox {
         void breakStatement();
         void continueStatement();
         void onceStatement();
+        void returnStatement();
         void emitLoop(size_t pos);
+        void emitReturn();
         size_t emitJump(OpCode opCode);
         void patchJump(size_t pos);
         void expressionStatement();
         void varDeclaration(bool constant = false);
         void constDeclaration();
+        void funDeclaration();
         void variable(bool);
+        void func(FunctionType ft);
         size_t previousLine() const;
         void parsePrecedence(Precedence precedence);
         const ParseRule& getRule(TokenType type) const;
@@ -88,9 +100,10 @@ namespace lox {
         size_t addLocal(StringView name, bool constant);
         Optional<size_t> resolveLocal(StringView name);
         void markInitialized();
+        void beginCompile();
+        SharedPtr<Function> endCompile();
         Scanner scanner;
-        Parser parser;
-        Chunk chunk;
+        SharedPtr<Parser> parser;
         Table<InternedString, size_t> constants;
         HashSet<String> immutables;
 
@@ -104,6 +117,10 @@ namespace lox {
         size_t depth = 0;
         size_t onceTracker = 0;
         size_t numberOfOnces = 0;
+
+        SharedPtr<Function> function;
+        FunctionType functionType = FunctionType::SCRIPT;
+
         struct Loop {
             size_t depth = 0;
             size_t startLocation = 0;
