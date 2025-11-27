@@ -11,12 +11,30 @@
 namespace lox {
     const size_t FRAMES_MAX = 64;
 
-    Value clockNative(int, Span<Value>) {
-        return double(std::chrono::steady_clock::now().time_since_epoch().count());
+    Expected<Value, String> clockNative(Span<Value>) {
+        return Value{double(std::chrono::steady_clock::now().time_since_epoch().count())};
+    }
+
+    Expected<Value, String> random(Span<Value> values) {
+        if (values.size() != 2) {
+            return String{"Must have two arguments"};
+        }
+        auto val1 = *values.begin();
+        auto val2 = *(values.begin() + 1);
+        if (!std::holds_alternative<double>(val1) || !std::holds_alternative<double>(val2)) {
+            return String{"Must pass in numbers to random"};
+        }
+        int num1 = int(std::get<double>(val1));
+        int num2 = int(std::get<double>(val2));
+        if (num1 >= num2) {
+            return String{"Second number must be bigger than first number"};
+        }
+        return Value{double(num1 + rand() % (num2 - num1))};
     }
 
     VM::VM() {
-        defineNative("clock", clockNative);
+        defineNative("clock", clockNative, 0);
+        defineNative("random", random, 2);
     }
     InterpretResult VM::interpret(const String& s) {
         Compiler compiler(s);
@@ -211,7 +229,10 @@ namespace lox {
                     }
                     // pop func
                     stack.pop();
-                    stack.push(result);
+                    if (!result.hasValue()) {
+                        throw Exception(result.error().c_str(), nullptr);
+                    }
+                    stack.push(result.value());
                 },
                 [this](auto) { throw Exception("Can only call functions and classes", nullptr); }},
             callee);
@@ -227,7 +248,7 @@ namespace lox {
         frames.push(CallFrame{func, stack, argCount});
     }
 
-    void VM::defineNative(StringView name, NativeFunction::Function f) {
-        globals.insert(name, SharedPtr<NativeFunction>::Make(f));
+    void VM::defineNative(StringView name, NativeFunction::Func f, size_t args) {
+        globals.insert(name, SharedPtr<NativeFunction>::Make(f, args));
     }
 }

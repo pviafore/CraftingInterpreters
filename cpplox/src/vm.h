@@ -2,6 +2,7 @@
 #define CPPLOX_VM_H_
 
 #include "chunk.h"
+#include "object.h"
 #include "stack.h"
 #include "string.h"
 #include "table.h"
@@ -59,7 +60,7 @@ namespace lox {
         void verifyNumber(size_t stackIndex = 0) const;
         void verifyString(size_t stackIndex = 0) const;
         void defineGlobal(const Chunk& chunk, uint32_t constant);
-        void defineNative(StringView name, NativeFunction::Function f);
+        void defineNative(StringView name, NativeFunction::Func f, size_t argCount);
 
         InterpretResult pushGlobal(const Chunk& chunk, uint32_t constant);
         InterpretResult assignGlobal(const Chunk& chunk, uint32_t constant);

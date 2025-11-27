@@ -4,6 +4,7 @@
 #include <format>
 #include <variant>
 
+#include "expected.h"
 #include "interned.h"
 #include "memory.h"
 #include "object.h"
@@ -16,16 +17,17 @@ namespace lox {
 
     class NativeFunction {
     public:
-        using Function = std::function<Value(int, Span<Value>)>;
-        NativeFunction(Function f);
-        Value invoke(int argCount, Span<Value> values);
+        using Func = std::function<Expected<Value, String>(Span<Value>)>;
+        NativeFunction(Func f, size_t argCount);
+        Expected<Value, String> invoke(size_t args, Span<Value> values);
 
         friend bool operator==(const NativeFunction& f1, const NativeFunction& f2) {
-            return f1.function == f2.function;
+            return &f1 == &f2;
         }
 
     private:
-        Function function;
+        Func function;
+        size_t argCount;
     };
 
     inline bool isFalsey(Value value) {

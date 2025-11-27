@@ -17,6 +17,10 @@ namespace lox {
             return endPtr;
         }
 
+        size_t size() const {
+            return endPtr - startPtr;
+        }
+
         using value_type = T;
 
     private:

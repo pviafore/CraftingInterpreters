@@ -22,9 +22,12 @@ namespace lox {
         return arity;
     }
 
-    NativeFunction::NativeFunction(std::function<Value(int, Span<Value>)> f) : function(f) {}
+    NativeFunction::NativeFunction(Func f, size_t argCount) : function(f), argCount(argCount) {}
 
-    Value NativeFunction::invoke(int argCount, Span<Value> values) {
-        return function(argCount, values);
+    Expected<Value, String> NativeFunction::invoke(size_t args, Span<Value> values) {
+        if (args != this->argCount) {
+            return String{"Wrong number of arguments"};
+        }
+        return function(values);
     }
 }

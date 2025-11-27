@@ -695,3 +695,21 @@ state on the stack, and we will have up to 64 onces in a program. Program state 
 It will be a compile error if there are more than 64 once statements in a program. 
 
 To do this, we need a once statement, and we need a BitwiseAnd operation (we'll use the program state as a mask and the number of onces are a bitmask)
+
+# Chapter 24
+
+1. Put the IP in a register and benchmark.
+
+I'm not focused on optimization, so it's not trivial for me to do this, so skipping.
+
+2. Add arity checking for native functions.
+
+See code
+
+3. Allow native functions to return error messages
+
+See code
+
+4. Define more native functions
+
+Added random()
