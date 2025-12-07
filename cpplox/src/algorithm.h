@@ -193,6 +193,16 @@ namespace lox {
             return it1 == r1.end() && it2 == r2.end();
         }
 
+        template <range Range>
+        constexpr bool anyOf(const Range& r, std::function<bool(const typename Range::value_type&)> f) {
+            for (const auto& e : r) {
+                if (f(e)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
     }
 }
 #endif

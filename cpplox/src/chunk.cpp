@@ -6,9 +6,9 @@
 namespace lox {
 
     std::byte unknown = static_cast<std::byte>(std::to_underlying(OpCode::Unknown));
-    Instruction::Instruction() : _instruction(Unknown{&unknown}), _offset(0) {}
+    Instruction::Instruction() : _instruction(Unknown{&unknown}), _offset(0), chunk(nullptr) {}
 
-    Instruction::InstVariant makeInstruction(const std::byte* buffer) {
+    Instruction::InstVariant makeInstruction(const std::byte* buffer, const Chunk* chunk) {
         OpCode code = OpCode{static_cast<uint8_t>(*(buffer))};
         switch (code) {
         case OpCode::Add:
@@ -24,6 +24,10 @@ namespace lox {
             return BinaryPredicate(buffer);
         case OpCode::Call:
             return Call(buffer);
+        case OpCode::CloseUpValue:
+            return CloseUpValue();
+        case OpCode::Closure:
+            return ClosureOp(buffer, chunk);
         case OpCode::Constant:
             return Constant(buffer);
         case OpCode::LongConstant:
@@ -44,6 +48,10 @@ namespace lox {
             return SetLocal(buffer);
         case OpCode::GetLocal:
             return GetLocal(buffer);
+        case OpCode::SetUpValue:
+            return SetUpValue(buffer);
+        case OpCode::GetUpValue:
+            return GetUpValue(buffer);
         case OpCode::Equal:
             return Equal{};
         case OpCode::JumpIfFalse:
@@ -72,7 +80,7 @@ namespace lox {
             return Unknown{buffer};
         }
     }
-    Instruction::Instruction(const std::byte* buffer, size_t offset) : _instruction(makeInstruction(buffer)), _offset(offset) {
+    Instruction::Instruction(const std::byte* buffer, size_t offset, const Chunk* chunk) : _instruction(makeInstruction(buffer, chunk)), _offset(offset) {
     }
 
     Instruction::InstVariant Instruction::instruction() const {
@@ -89,8 +97,13 @@ namespace lox {
         return (static_cast<uint8_t>(*buffer) << 16) + (static_cast<uint8_t>(*(buffer + 1)) << 8) + static_cast<uint8_t>(*(buffer + 2));
     }
 
-    Chunk::InstructionIterator::InstructionIterator(Vector<std::byte>::const_iterator it) {
-        this->current = it;
+    std::vector<Function::UpValue> getUpValues(const Chunk* chunk, size_t index) {
+        auto func = std::get<SharedPtr<Function>>(chunk->getConstant(index));
+        auto uvs = func->getUpvalues();
+        return std::vector<Function::UpValue>{uvs.begin(), uvs.end()};
+    }
+
+    Chunk::InstructionIterator::InstructionIterator(Vector<std::byte>::const_iterator it, const Chunk* chunk) : current(it), chunk(chunk) {
         parseInstruction();
     }
 
@@ -150,7 +163,7 @@ namespace lox {
         if (parsed) {
             return;
         }
-        instruction = Instruction(current, offset);
+        instruction = Instruction(current, offset, chunk);
         parsed = true;
     }
     void Chunk::write(lox::OpCode value, size_t line) {
@@ -193,11 +206,11 @@ namespace lox {
     }
 
     Chunk::InstructionIterator Chunk::begin() const {
-        return InstructionIterator(data.begin());
+        return InstructionIterator(data.begin(), this);
     }
 
     Chunk::InstructionIterator Chunk::end() const {
-        return InstructionIterator(data.end());
+        return InstructionIterator(data.end(), this);
     }
 
     void Chunk::writeConstant(Value value, size_t line) {

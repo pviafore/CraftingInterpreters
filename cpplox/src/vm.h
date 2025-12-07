@@ -2,6 +2,7 @@
 #define CPPLOX_VM_H_
 
 #include "chunk.h"
+#include "list.h"
 #include "object.h"
 #include "stack.h"
 #include "string.h"
@@ -26,29 +27,33 @@ namespace lox {
 
         struct CallFrame {
         public:
-            CallFrame(SharedPtr<Function> f, DynamicStack<Value>& stack, int argCount = 0) : function(f), instructionPtr(function->getChunk()->begin()), slots(&stack), offset(argCount + 1) {}
+            CallFrame(SharedPtr<Closure> f, DynamicStack<Value>& stack, size_t offset = 0) : function(f), instructionPtr(function->getFunction()->getChunk()->begin()), slots(&stack), offset(offset) {}
             Chunk::InstructionIterator& getIp() {
                 return instructionPtr;
             }
 
             void push(Value v) {
-                (*slots).push(v);
+                slots->push(v);
             }
 
             const Value& peek(size_t index = 0) const {
-                return (*slots).peek(index - offset);
+                return (*slots)[index + offset];
             }
 
             void assign(size_t index, const Value& value) {
-                (*slots)[index - offset] = value;
+                (*slots)[index + offset] = value;
             }
 
-            SharedPtr<Function> getFunction() const {
+            SharedPtr<Closure> getFunction() const {
                 return function;
             }
 
+            size_t getOffset() const {
+                return offset;
+            }
+
         private:
-            SharedPtr<Function> function;
+            SharedPtr<Closure> function;
             Chunk::InstructionIterator instructionPtr;
             DynamicStack<Value>* slots;
             size_t offset;
@@ -61,6 +66,8 @@ namespace lox {
         void verifyString(size_t stackIndex = 0) const;
         void defineGlobal(const Chunk& chunk, uint32_t constant);
         void defineNative(StringView name, NativeFunction::Func f, size_t argCount);
+        SharedPtr<UpValueObj> captureUpValue(DynamicStack<Value>::iterator);
+        void closeUpValues(const DynamicStack<Value>::iterator iter);
 
         InterpretResult pushGlobal(const Chunk& chunk, uint32_t constant);
         InterpretResult assignGlobal(const Chunk& chunk, uint32_t constant);
@@ -68,11 +75,12 @@ namespace lox {
         void pushLocal(size_t constant);
         void assignLocal(size_t constant);
         void callValue(Value callee, int argCount);
-        void call(SharedPtr<Function> func, int argCount);
+        void call(SharedPtr<Closure> func, size_t argCount);
         double popNumber();
         void binaryOp(const Binary& bin);
         DynamicStack<Value> stack;
         DynamicStack<CallFrame> frames;
+        List<SharedPtr<UpValueObj>> openUpValues;
         Table<InternedString, Value> globals;
     };
 }

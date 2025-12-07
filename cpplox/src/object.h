@@ -4,6 +4,7 @@
 #include <any>
 
 #include "memory.h"
+#include "stack.h"
 #include "string.h"
 namespace lox {
     class Chunk;
@@ -22,11 +23,21 @@ namespace lox {
         }
 
         void increaseArity();
+        size_t addUpvalue(size_t index, bool isLocal);
+        Optional<size_t> getUpvalue(size_t index, bool isLocal);
+        size_t getUpValueCount() const;
+
+        struct UpValue {
+            bool isLocal = false;
+            size_t index = 0;
+        };
+        const Vector<UpValue>& getUpvalues() const;
 
     private:
         uint8_t arity = 0;
         StringView name;
         SharedPtr<Chunk> chunk;
+        Vector<UpValue> upvalues;
     };
 
 }

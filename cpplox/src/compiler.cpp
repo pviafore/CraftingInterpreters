@@ -14,16 +14,20 @@ namespace lox {
     }
 
     Compiler::Compiler(const String& s) : scanner(s), parser(SharedPtr<Parser>::Make(scanner.begin())), function(SharedPtr<Function>::Make("<script>")), functionType(FunctionType::SCRIPT) {}
-    Compiler::Compiler(SharedPtr<Parser> parser) : scanner(nullptr), parser(parser), function(SharedPtr<Function>::Make(parser->getPreviousToken().token)), functionType(FunctionType::FUNCTION) {
+    Compiler::Compiler(Compiler* enclosing) : scanner(nullptr), parser(enclosing->parser), function(SharedPtr<Function>::Make(parser->getPreviousToken().token)), functionType(FunctionType::FUNCTION), enclosing(enclosing) {
     }
     void Compiler::beginCompile() {
         addLocal(ReservedInternal::ProgramState, false);  // the function that is being called pushed by VM
-        emitConstant(0.0);                                // for onces
+    }
+
+    void Compiler::setupOnceTracking() {
+        emitConstant(0.0);  // for onces
         onceTracker = addLocal(ReservedInternal::OnceTracker, false);
         getCurrentChunk()->writeOpAndIndex(OpCode::SetLocal, OpCode::SetLocal, onceTracker, parser->getPreviousToken().line);
     }
     SharedPtr<Function> Compiler::compile() {
         beginCompile();
+        setupOnceTracking();
         while (!parser->match(TokenType::Eof)) {
             declaration();
         }
@@ -339,7 +343,8 @@ namespace lox {
         depth--;
 
         while (locals.size() > 0 && locals.back().depth > depth) {
-            emit(OpCode::Pop);
+            auto opcode = (locals.back().isCaptured) ? OpCode::CloseUpValue : OpCode::Pop;
+            emit(opcode);
             locals.pop_back();
         }
     }
@@ -603,6 +608,9 @@ namespace lox {
             setop = setLongOp = OpCode::SetLocal;
             getop = getLongOp = OpCode::GetLocal;
             isConstant = locals[index.value()].constant;
+        } else if (index = resolveUpvalue(name); index.hasValue()) {
+            setop = setLongOp = OpCode::SetUpValue;
+            getop = getLongOp = OpCode::GetUpValue;
         } else {
             index = addIdentifierConstant(name, isConstant);
         }
@@ -632,6 +640,30 @@ namespace lox {
         return {};
     }
 
+    Optional<size_t> Compiler::resolveUpvalue(StringView name) {
+        if (enclosing) {
+            auto local = enclosing->resolveLocal(name);
+            if (local.hasValue()) {
+                enclosing->locals[local.value()].isCaptured = true;
+                return addUpvalue(local.value(), true);
+            }
+
+            auto upvalue = enclosing->resolveUpvalue(name);
+            if (upvalue.hasValue()) {
+                return addUpvalue(upvalue.value(), false);
+            }
+        }
+        return {};
+    }
+
+    size_t Compiler::addUpvalue(size_t index, bool isLocal) {
+        auto upvalueIndex = function->getUpvalue(index, isLocal);
+        if (upvalueIndex.hasValue()) {
+            return index;
+        }
+        return function->addUpvalue(index, isLocal);
+    }
+
     void Compiler::varDeclaration(bool constant) {
         auto global = parseVariable("Expect variable name", constant);
 
@@ -657,23 +689,34 @@ namespace lox {
     }
 
     void Compiler::func(FunctionType) {
-        Compiler compiler(parser);
+        Compiler compiler(this);
+        compiler.debugMode = debugMode;
         compiler.beginCompile();
         compiler.beginScope();
         parser->consume(TokenType::LeftParen, "Expect '(' after function name");
         if (!parser->check(TokenType::RightParen)) {
             do {
-                function->increaseArity();
+                compiler.function->increaseArity();
                 size_t constant = compiler.parseVariable("Expect parameter name", true);
                 compiler.defineVariable(constant);
             } while (parser->match(TokenType::Comma));
         }
         parser->consume(TokenType::RightParen, "Expect ')' after parameters");
         parser->consume(TokenType::LeftBrace, "Expect '{' before function body");
+        compiler.setupOnceTracking();
         compiler.block();
 
         auto function = compiler.endCompile();
-        emitConstant(function);
+        emit(OpCode::Closure);
+        size_t index = this->function->getChunk()->addConstant(function);
+        if (index >= 255) {
+            parser->errorAtPrevious("Too many constants");
+        }
+        emit(uint8_t(index & 0xFF));
+        for (auto& upvalue : function->getUpvalues()) {
+            emit(upvalue.isLocal ? 1 : 0);
+            emit(upvalue.index);
+        }
     }
 
     size_t Compiler::parseVariable(StringView errorMessage, bool constant) {

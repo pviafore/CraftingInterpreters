@@ -22,7 +22,7 @@ struct std::formatter<lox::Chunk, char> {
     constexpr FmtContext::iterator format(const lox::Chunk& chunk, FmtContext& ctx) const {
         std::ostringstream out;
 
-        for (const auto& instruction : chunk) {
+        for (auto& instruction : chunk) {
             lox::formatInstruction(out, chunk, instruction);
         }
 

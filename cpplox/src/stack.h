@@ -9,7 +9,6 @@
 
 #include "algorithm.h"
 #include "array.h"
-#include "value.h"
 #include "vector.h"
 namespace lox {
     // this is a static amount of memory - not heap allocated
@@ -107,6 +106,14 @@ namespace lox {
             return stack.begin();
         }
         const T* end() const {
+            return stack.end();
+        }
+
+        T* begin() {
+            return stack.begin();
+        }
+
+        T* end() {
             return stack.end();
         }
 

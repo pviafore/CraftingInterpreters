@@ -43,8 +43,9 @@ namespace lox {
         if (!function) {
             return InterpretResult::CompileError;
         }
-        stack.push(function);
-        call(function, 0);
+        auto closure = SharedPtr<Closure>::Make(function);
+        stack.push(closure);
+        call(closure, 0);
         return run();
     }
 
@@ -60,8 +61,8 @@ namespace lox {
     InterpretResult VM::run() {
         Optional<InterpretResult> returnCode;
         try {
-            while (!frames.empty() && frames.top().getIp() != frames.top().getFunction()->getChunk()->end()) {
-                const auto& chunk = **frames.top().getFunction()->getChunk();
+            while (!frames.empty() && frames.top().getIp() != frames.top().getFunction()->getFunction()->getChunk()->end()) {
+                const auto& chunk = **frames.top().getFunction()->getFunction()->getChunk();
                 auto& ip = frames.top().getIp();
                 if (diagnosticMode) {
                     std::println("{}", stack);
@@ -81,7 +82,26 @@ namespace lox {
                         [this, &returnCode](const Call& c) {
                             callValue(stack.peek(c.value()), c.value());
                         },
-                        [&chunk, this](const Constant& c) { stack.push(chunk.getConstant(c.value())); },
+                        [&chunk, this](const ClosureOp& c) {
+                            auto value = chunk.getConstant(c.value());
+                            if (!std::holds_alternative<SharedPtr<Function>>(value)) {
+                                throw Exception("Closure was not a function", nullptr);
+                            }
+                            auto func = std::get<SharedPtr<Function>>(value);
+                            auto closure = SharedPtr<Closure>::Make(func);
+                            stack.push(closure);
+                            for (auto upvalue : c.getUpValues()) {
+                                if (upvalue.isLocal) {
+                                    closure->addUpValue(captureUpValue(stack.begin() + frames.top().getOffset() + upvalue.index));
+                                } else {
+                                    auto sp = frames.top().getFunction()->getUpValue(upvalue.index);
+                                    closure->addUpValue(sp);
+                                }
+                            }
+                        },
+                        [&chunk, this](const Constant& c) {
+                            stack.push(chunk.getConstant(c.value()));
+                        },
                         [&chunk, this](const LongConstant& c) { stack.push(chunk.getConstant(c.value())); },
                         [&chunk, this](const DefineGlobal& d) { defineGlobal(chunk, d.value()); },
                         [&chunk, this](const LongDefineGlobal& d) { defineGlobal(chunk, d.value()); },
@@ -91,20 +111,27 @@ namespace lox {
                         [&chunk, &returnCode, this](const LongGetGlobal& g) { returnCode = pushGlobal(chunk, g.value()); },
                         [&chunk, &returnCode, this](const GetLocal& g) { pushLocal(g.value()); },
                         [&chunk, &returnCode, this](const SetLocal& s) { assignLocal(s.value()); },
+                        [&chunk, &returnCode, this](const GetUpValue& g) { stack.push(*frames.top().getFunction()->getUpValue(g.value())->location); },
+                        [&chunk, &returnCode, this](const SetUpValue& s) { frames.top().getFunction()->setUpValue(s.value(), stack.peek()); },
                         [&ip, &jumped, this](const JumpIfFalse& j) { if (isFalsey(stack.peek())) { ip += j.value(); jumped = true;} },
                         [&ip, &jumped, this](const Jump& j) { ip += j.value(); jumped = true; },
                         [&ip, &jumped, this](const Loop& l) { ip.resetBy(l.value()); jumped = true; },
                         [this](const Negate&) { this->negate(); },
                         [this](const Print&) { std::println("{}", stack.pop()); },
                         [this](const Pop&) { stack.pop(); },
+                        [this](const CloseUpValue&) { closeUpValues(stack.begin() + stack.size() - 1); stack.pop(); },
                         [this](const Nil&) { stack.push(nullptr); },
                         [this](const Not&) { stack.push(isFalsey(stack.pop())); },
                         [&returnCode, this, &jumped](const Return&) {
                             auto result = stack.pop();
-                            frames.pop();
+                            closeUpValues(stack.begin() + frames.top().getOffset());
+                            auto lastFrame = frames.pop();
                             if (frames.empty()) {
                                 stack.pop();
                             } else {
+                                while (stack.size() > lastFrame.getOffset()) {
+                                    stack.pop();  // go back down to before the offset
+                                }
                                 stack.push(result);
                             }
                             jumped = true;
@@ -125,7 +152,7 @@ namespace lox {
         } catch (lox::Exception& e) {
             std::println(std::cerr, "Error: {}", e.what());
             for (auto f : views::reversed<DynamicStack<CallFrame>>(frames)) {
-                std::println(std::cerr, "[Line {} in {}]", f.getFunction()->getChunk()->getLineNumber(f.getIp()->offset()), f.getFunction()->getName());
+                std::println(std::cerr, "[Line {} in {}]", f.getFunction()->getFunction()->getChunk()->getLineNumber(f.getIp()->offset()), f.getFunction()->getFunction()->getName());
             }
             while (!frames.empty()) {
                 frames.pop();
@@ -136,6 +163,17 @@ namespace lox {
             return InterpretResult::RuntimeError;
         }
         return InterpretResult::Ok;
+    }
+
+    SharedPtr<UpValueObj> VM::captureUpValue(DynamicStack<Value>::iterator iter) {
+        auto node = openUpValues.findNextClosest(SharedPtr<UpValueObj>::Make(iter));
+        if (node && node->value->location == iter) {
+            return node->value;
+        }
+
+        auto created = SharedPtr<UpValueObj>::Make(iter);
+        openUpValues.insertBefore(created, node);
+        return created;
     }
 
     void VM::binaryOp(const Binary& bin) {
@@ -221,7 +259,7 @@ namespace lox {
     void VM::callValue(Value callee, int argCount) {
         std::visit(
             overload{
-                [this, argCount](SharedPtr<Function> func) { call(func, argCount); },
+                [this, argCount](SharedPtr<Closure> func) { call(func, argCount); },
                 [this, argCount](SharedPtr<NativeFunction> func) {
                     auto result = func->invoke(argCount, Span(stack.begin() + stack.size() - argCount, argCount));
                     for (auto i = 0; i < argCount; i++) {
@@ -238,17 +276,29 @@ namespace lox {
             callee);
     }
 
-    void VM::call(SharedPtr<Function> func, int argCount) {
-        if (argCount != func->getArity()) {
-            throw Exception(std::format("Expected {} arguments but got {}.", func->getArity(), argCount).c_str(), nullptr);
+    void VM::call(SharedPtr<Closure> func, size_t argCount) {
+        if (argCount != func->getFunction()->getArity()) {
+            throw Exception(std::format("Expected {} arguments but got {}.", func->getFunction()->getArity(), argCount).c_str(), nullptr);
         }
         if (frames.size() == FRAMES_MAX) {
             throw Exception("Stack overflow.", nullptr);
         }
-        frames.push(CallFrame{func, stack, argCount});
+        if (stack.size() < argCount + 1) {
+            throw Exception("Stack corruption", nullptr);
+        }
+        frames.push(CallFrame{func, stack, stack.size() - argCount - 1});
     }
 
     void VM::defineNative(StringView name, NativeFunction::Func f, size_t args) {
         globals.insert(name, SharedPtr<NativeFunction>::Make(f, args));
     }
+
+    void VM::closeUpValues(const DynamicStack<Value>::iterator iter) {
+        while (openUpValues.front() && openUpValues.front()->value->location >= iter) {
+            auto upvalue = openUpValues.front()->value;
+            upvalue->close();
+            openUpValues.popFront();
+        }
+    }
+
 }

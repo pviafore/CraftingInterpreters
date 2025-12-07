@@ -37,7 +37,7 @@ namespace lox {
         bool debugMode = false;
 
     private:
-        Compiler(SharedPtr<Parser> parser);
+        Compiler(Compiler* compiler);
         using ParseFn = std::function<void(Compiler*, bool)>;
         struct ParseRule {
             ParseFn prefix{};
@@ -99,6 +99,9 @@ namespace lox {
         void declareVariable(bool constant);
         size_t addLocal(StringView name, bool constant);
         Optional<size_t> resolveLocal(StringView name);
+        Optional<size_t> resolveUpvalue(StringView name);
+        size_t addUpvalue(size_t index, bool isLocal);
+        void setupOnceTracking();
         void markInitialized();
         void beginCompile();
         SharedPtr<Function> endCompile();
@@ -111,6 +114,7 @@ namespace lox {
             StringView name;
             Optional<size_t> depth;  // will not have a value if its uninitialized
             bool constant;
+            bool isCaptured = false;
         };
         StaticVector<Local, 1024> locals;
         size_t localCount = 0;
@@ -120,6 +124,7 @@ namespace lox {
 
         SharedPtr<Function> function;
         FunctionType functionType = FunctionType::SCRIPT;
+        Compiler* enclosing = nullptr;
 
         struct Loop {
             size_t depth = 0;

@@ -17,12 +17,15 @@ namespace lox {
         BitwiseAnd,
         BitwiseOr,
         Call,
+        Closure,
+        CloseUpValue,
         Constant,
         DefineGlobal,
         LongDefineGlobal,
         Equal,
         GetGlobal,
         GetLocal,
+        GetUpValue,
         LongGetGlobal,
         Greater,
         JumpIfFalse,
@@ -42,11 +45,13 @@ namespace lox {
         Return,
         SetGlobal,
         SetLocal,
+        SetUpValue,
         LongSetGlobal,
         Subtract,
         Unknown
     };
 
+    class Chunk;
     struct _Instruction {
     public:
         _Instruction(OpCode opcode, size_t size, std::string name) : opcode(opcode), size(size), name(std::move(name)) {}
@@ -75,7 +80,22 @@ namespace lox {
 
     class Call : public _OpAndValueInstruction<uint8_t> {
     public:
-        Call(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Constant, "OP_CALL") {}
+        Call(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Call, "OP_CALL") {}
+    };
+
+    std::vector<Function::UpValue> getUpValues(const Chunk* chunk, size_t index);
+    class ClosureOp : public _OpAndValueInstruction<uint8_t> {
+    public:
+        ClosureOp(const std::byte* buffer, const Chunk* chunk) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Closure, "OP_CLOSURE"), upvalues(lox::getUpValues(chunk, value())) {
+            size = 2 + 2 * upvalues.size();
+        }
+
+        const std::vector<Function::UpValue>& getUpValues() const {
+            return upvalues;
+        }
+
+    private:
+        std::vector<Function::UpValue> upvalues;
     };
     class Constant : public _OpAndValueInstruction<uint8_t> {
     public:
@@ -122,6 +142,14 @@ namespace lox {
     class SetLocal : public _OpAndValueInstruction<uint8_t> {
     public:
         SetLocal(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::SetLocal, "OP_SET_LOCAL") {}
+    };
+    class GetUpValue : public _OpAndValueInstruction<uint8_t> {
+    public:
+        GetUpValue(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::GetUpValue, "OP_GET_UPVALUE") {}
+    };
+    class SetUpValue : public _OpAndValueInstruction<uint8_t> {
+    public:
+        SetUpValue(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::SetUpValue, "OP_SET_UPVALUE") {}
     };
 
     class Equal : public _Instruction {
@@ -174,6 +202,11 @@ namespace lox {
     public:
         Pop() : _Instruction(OpCode::Pop, 1, "OP_POP") {}
     };
+    class CloseUpValue : public _Instruction {
+    public:
+        CloseUpValue() : _Instruction(OpCode::CloseUpValue, 1, "OP_CLOSE_UPVALUE") {}
+    };
+
     class Return : public _Instruction {
     public:
         Return() : _Instruction(OpCode::Return, 1, "OP_RETURN") {}
@@ -267,15 +300,15 @@ namespace lox {
     public:
         Instruction();
         // buffer should be at the current instruction, and offset says how far this point is from the original buffer
-        Instruction(const std::byte* buffer, size_t offset);
+        Instruction(const std::byte* buffer, size_t offset, const Chunk* chunk);
         Instruction(const Instruction& rhs) = default;
         Instruction& operator=(const Instruction& rhs) = default;
         Instruction(Instruction&& rhs) = default;
         Instruction& operator=(Instruction&& rhs) = default;
 
-        using InstVariant = std::variant<Binary, BinaryPredicate, Call, Constant, DefineGlobal, GetGlobal, Equal, False, LongConstant, LongDefineGlobal, LongGetGlobal,
-                                         Negate, Nil, Not, Print, Pop, Return, SetGlobal, LongSetGlobal, GetLocal, SetLocal, JumpIfFalse, Jump, Loop,
-                                         True, Unknown>;
+        using InstVariant = std::variant<Binary, BinaryPredicate, Call, ClosureOp, Constant, DefineGlobal, GetGlobal, Equal, False, LongConstant,
+                                         LongDefineGlobal, LongGetGlobal, Negate, Nil, Not, Print, Pop, Return, SetGlobal, LongSetGlobal, GetLocal,
+                                         SetLocal, GetUpValue, SetUpValue, JumpIfFalse, Jump, Loop, True, CloseUpValue, Unknown>;
         InstVariant instruction() const;
         size_t offset() const;
         size_t size() const;
@@ -283,13 +316,14 @@ namespace lox {
     private:
         InstVariant _instruction;
         size_t _offset = 0;
+        const Chunk* chunk = nullptr;
     };
 
     class Chunk {
     public:
         class InstructionIterator {
         public:
-            InstructionIterator(Vector<std::byte>::const_iterator it);
+            InstructionIterator(Vector<std::byte>::const_iterator it, const Chunk* chunk);
             // Dereference operator
             Instruction& operator*();
 
@@ -318,6 +352,7 @@ namespace lox {
             Instruction instruction;
             size_t offset = 0;
             bool parsed = false;
+            const Chunk* chunk = nullptr;
         };
 
         using iterator_type = InstructionIterator;

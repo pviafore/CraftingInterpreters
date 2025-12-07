@@ -26,6 +26,13 @@ namespace lox {
         out << std::format("{:<32}({} {})", i.name, i.value(), i.value() + offset);
     }
 
+    void withClosure(std::ostringstream& out, const Chunk& chunk, const ClosureOp& closure) {
+        withConstant(out, chunk, closure);
+        for (auto upvalue : closure.getUpValues()) {
+            out << std::format("\n        |             {} {} ", (upvalue.isLocal ? "local" : "upvalue"), upvalue.index);
+        }
+    }
+
     void disassembleInstruction(const lox::Chunk& chunk, const lox::Instruction& instruction) {
         std::ostringstream out;
         formatInstruction(out, chunk, instruction);
@@ -42,6 +49,7 @@ namespace lox {
         auto inst = instruction.instruction();
         auto overloads = overload{
             [&out, &chunk, &instruction](Call& o) { withConstant(out, chunk, o); },
+            [&out, &chunk, &instruction](ClosureOp& o) { withClosure(out, chunk, o); },
             [&out, &chunk, &instruction](Constant& o) { withConstant(out, chunk, o); },
             [&out, &chunk, &instruction](LongConstant& o) { withConstant(out, chunk, o); },
             [&out, &chunk, &instruction](DefineGlobal& o) { withConstant(out, chunk, o); },
@@ -52,6 +60,8 @@ namespace lox {
             [&out, &chunk, &instruction](LongSetGlobal& o) { withConstant(out, chunk, o); },
             [&out, &chunk, &instruction](GetLocal& o) { withRawValue(out, o); },
             [&out, &chunk, &instruction](SetLocal& o) { withRawValue(out, o); },
+            [&out, &chunk, &instruction](GetUpValue& o) { withRawValue(out, o); },
+            [&out, &chunk, &instruction](SetUpValue& o) { withRawValue(out, o); },
             [&out, &chunk, &instruction](JumpIfFalse& o) { withJump(out, o, instruction.offset()); },
             [&out, &chunk, &instruction](Jump& o) { withJump(out, o, instruction.offset()); },
             [&out, &chunk, &instruction](Loop& o) { withJump(out, o, -1 * instruction.offset()); },
