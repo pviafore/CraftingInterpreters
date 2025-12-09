@@ -56,6 +56,7 @@ namespace lox {
         void string(bool);
         void expression();
         void grouping(bool);
+        void dot(bool);
         void unary(bool);
         void binary(bool);
         void ternary(bool);
@@ -89,6 +90,7 @@ namespace lox {
         void constDeclaration();
         void funDeclaration();
         void variable(bool);
+        void classDeclaration();
         void func(FunctionType ft);
         size_t previousLine() const;
         void parsePrecedence(Precedence precedence);

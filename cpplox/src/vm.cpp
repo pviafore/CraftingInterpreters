@@ -41,7 +41,6 @@ namespace lox {
     }
     InterpretResult VM::interpret(const String& s) {
         Compiler compiler(s);
-        compiler.debugMode = true;
         auto function = compiler.compile();
         if (!function) {
             return InterpretResult::CompileError;
@@ -105,7 +104,10 @@ namespace lox {
                         [&chunk, this](const Constant& c) {
                             stack.push(chunk.getConstant(c.value()));
                         },
-                        [&chunk, this](const LongConstant& c) { stack.push(chunk.getConstant(c.value())); },
+                        [&chunk, this](const ClassOp& c) { stack.push(SharedPtr<Class>::Make(std::get<InternedString>(chunk.getConstant(c.value())))); },
+                        [&chunk, this](const LongConstant& c) {
+                            stack.push(chunk.getConstant(c.value()));
+                        },
                         [&chunk, this](const DefineGlobal& d) { defineGlobal(chunk, d.value()); },
                         [&chunk, this](const LongDefineGlobal& d) { defineGlobal(chunk, d.value()); },
                         [this](const Equal&) { stack.push(areEqual(stack.pop(), stack.pop())); },
@@ -114,6 +116,33 @@ namespace lox {
                         [&chunk, &returnCode, this](const LongGetGlobal& g) { returnCode = pushGlobal(chunk, g.value()); },
                         [&chunk, &returnCode, this](const GetLocal& g) { pushLocal(g.value()); },
                         [&chunk, &returnCode, this](const SetLocal& s) { assignLocal(s.value()); },
+                        [&chunk, &returnCode, this](const GetProperty& g) {
+                            if (!std::holds_alternative<SharedPtr<Instance>>(stack.peek())) {
+                                throw Exception("Only instances have properties.", nullptr);
+                            }
+                            auto instance = std::get<SharedPtr<Instance>>(stack.peek());
+                            auto name = std::get<InternedString>(chunk.getConstant(g.value()));
+                            auto value = instance->getField(name);
+                            if (value.hasValue()) {
+                                stack.pop();
+                                stack.push(value.value());
+                            } else {
+                                std::string s = std::format("Undefined property {}", name);
+                                throw Exception(s.c_str(), nullptr);
+                            }
+                        },
+                        [&chunk, &returnCode, this](const SetProperty& s) {
+                            if (!std::holds_alternative<SharedPtr<Instance>>(stack.peek(1))) {
+                                throw Exception("Only instances have properties.", nullptr);
+                            }
+
+                            auto instance = std::get<SharedPtr<Instance>>(stack.peek(1));
+                            auto name = std::get<InternedString>(chunk.getConstant(s.value()));
+                            instance->setField(name, stack.peek());
+                            auto v = stack.pop();
+                            stack.pop();
+                            stack.push(v);
+                        },
                         [&chunk, &returnCode, this](const GetUpValue& g) { stack.push(*(std::get<SharedPtr<Closure>>(frames.top().getCallable())->getUpValue(g.value())->location)); },
                         [&chunk, &returnCode, this](const SetUpValue& s) { std::get<SharedPtr<Closure>>(frames.top().getCallable())->setUpValue(s.value(), stack.peek()); },
                         [&ip, &jumped, this](const JumpIfFalse& j) { if (isFalsey(stack.peek())) { ip += j.value(); jumped = true;} },
@@ -264,6 +293,7 @@ namespace lox {
             overload{
                 [this, argCount](SharedPtr<Closure> func) { call(func, argCount); },
                 [this, argCount](SharedPtr<Function> func) { call(func, argCount); },
+                [this, argCount](SharedPtr<Class> cls) { stack[stack.size() - argCount - 1] = SharedPtr<Instance>::Make(cls); },
                 [this, argCount](SharedPtr<NativeFunction> func) {
                     auto result = func->invoke(argCount, Span(stack.begin() + stack.size() - argCount, argCount));
                     for (auto i = 0; i < argCount; i++) {
@@ -304,5 +334,4 @@ namespace lox {
             openUpValues.popFront();
         }
     }
-
 }

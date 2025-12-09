@@ -16,7 +16,10 @@ namespace lox {
     class Function;
     class Closure;
     struct UpValueObj;
-    using Value = std::variant<bool, std::nullptr_t, double, InternedString, SharedPtr<Function>, SharedPtr<NativeFunction>, SharedPtr<Closure>, SharedPtr<UpValueObj>>;
+    class Class;
+    class Instance;
+    using Value = std::variant<bool, std::nullptr_t, double, InternedString, SharedPtr<Function>, SharedPtr<NativeFunction>,
+                               SharedPtr<Closure>, SharedPtr<UpValueObj>, SharedPtr<Class>, SharedPtr<Instance>>;
 
     struct UpValueObj {
         Value* location;
@@ -75,6 +78,28 @@ namespace lox {
         SharedPtr<Function> f;
         Vector<SharedPtr<UpValueObj>> upvalues;
     };
+
+    class Class {
+    public:
+        Class(InternedString name);
+
+        StringView getName() const;
+
+    private:
+        InternedString name;
+    };
+
+    class Instance {
+    public:
+        Instance(SharedPtr<Class> cls);
+        StringView getName() const;
+        Optional<Value> getField(InternedString) const;
+        void setField(InternedString s, Value v);
+
+    private:
+        SharedPtr<Class> cls;
+        Table<InternedString, Value> fields;
+    };
 }
 
 template <class... Ts>
@@ -98,6 +123,8 @@ struct std::formatter<lox::Value> : std::formatter<std::string> {
                 [&ctx](double v) { return std::format("{}", v); },
                 [&ctx](bool v) { return v ? "true"s : "false"s; },
                 [&ctx](lox::SharedPtr<lox::Function> f) { return std::string(f->getName().str().c_str()); },
+                [&ctx](lox::SharedPtr<lox::Class> c) { return std::string(c->getName().str().c_str()); },
+                [&ctx](lox::SharedPtr<lox::Instance> i) { return std::string(i->getName().str().c_str()) + " instance"s; },
                 [&ctx](lox::SharedPtr<lox::Closure> f) { return std::string(f->getFunction()->getName().str().c_str()); },
                 [&ctx](lox::SharedPtr<lox::NativeFunction>) { return "<native fn>"s; },
                 [&ctx](lox::SharedPtr<lox::UpValueObj> v) { return std::format("{}", *(v->location)); }},

@@ -27,7 +27,7 @@ namespace lox {
         InterpretResult interpret(const String& string);
         InterpretResult run();
 
-        bool diagnosticMode = true;
+        bool diagnosticMode = false;
         struct CallFrame {
         public:
             CallFrame(Callable f, DynamicStack<Value>& stack, size_t offset = 0) : function(f), instructionPtr(lox::getFunction(f)->getChunk()->begin()), slots(&stack), offset(offset) {}

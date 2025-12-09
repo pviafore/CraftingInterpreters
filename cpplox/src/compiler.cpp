@@ -150,6 +150,18 @@ namespace lox {
         return Precedence{std::to_underlying(p) + 1};
     }
 
+    void Compiler::dot(bool canAssign) {
+        parser->consume(TokenType::Identifier, "Expect property name after .");
+        auto constant = addIdentifierConstant(parser->getPreviousToken().token, false);
+        if (canAssign && parser->match(TokenType::Equal)) {
+            expression();
+            emit(OpCode::SetProperty);
+        } else {
+            emit(OpCode::GetProperty);
+        }
+        emit(constant);
+    }
+
     void Compiler::binary(bool) {
         TokenType operatorType = parser->getPreviousToken().type;
         auto rule = getRule(operatorType);
@@ -239,6 +251,7 @@ namespace lox {
         const static ParseRule empty{};
         const static std::unordered_map<TokenType, ParseRule> rules{
             {TokenType::LeftParen, {&Compiler::grouping, &Compiler::call, Precedence::Call}},
+            {TokenType::Dot, {nullptr, &Compiler::dot, Precedence::Call}},
             {TokenType::Minus, {&Compiler::unary, &Compiler::binary, Precedence::Term}},
             {TokenType::Plus, {{}, &Compiler::binary, Precedence::Term}},
             {TokenType::Slash, {{}, &Compiler::binary, Precedence::Factor}},
@@ -292,6 +305,8 @@ namespace lox {
             constDeclaration();
         } else if (parser->match(TokenType::Fun)) {
             funDeclaration();
+        } else if (parser->match(TokenType::Class)) {
+            classDeclaration();
         } else {
             statement();
         }
@@ -718,6 +733,19 @@ namespace lox {
 
     void Compiler::constDeclaration() {
         varDeclaration(true);
+    }
+
+    void Compiler::classDeclaration() {
+        parser->consume(TokenType::Identifier, "Expect class name.");
+        auto constant = addIdentifierConstant(parser->getPreviousToken().token, true);
+        declareVariable(true);
+
+        emit(OpCode::Class);
+        emit(constant);
+        defineVariable(constant);
+
+        parser->consume(TokenType::LeftBrace, "Expect '{' before class body}");
+        parser->consume(TokenType::RightBrace, "Expect '}' after class body}");
     }
 
     void Compiler::funDeclaration() {

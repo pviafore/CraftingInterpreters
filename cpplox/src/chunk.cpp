@@ -24,6 +24,8 @@ namespace lox {
             return BinaryPredicate(buffer);
         case OpCode::Call:
             return Call(buffer);
+        case OpCode::Class:
+            return ClassOp(buffer);
         case OpCode::CloseUpValue:
             return CloseUpValue();
         case OpCode::Closure:
@@ -48,6 +50,10 @@ namespace lox {
             return SetLocal(buffer);
         case OpCode::GetLocal:
             return GetLocal(buffer);
+        case OpCode::SetProperty:
+            return SetProperty(buffer);
+        case OpCode::GetProperty:
+            return GetProperty(buffer);
         case OpCode::SetUpValue:
             return SetUpValue(buffer);
         case OpCode::GetUpValue:

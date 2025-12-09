@@ -74,4 +74,18 @@ namespace lox {
     void Closure::setUpValue(size_t index, Value value) {
         *(upvalues[index]->location) = value;
     }
+
+    Class::Class(InternedString name) : name(name) {}
+    StringView Class::getName() const { return name.string(); }
+
+    Instance::Instance(SharedPtr<Class> cls) : cls(cls) {}
+    StringView Instance::getName() const { return cls->getName(); }
+
+    Optional<Value> Instance::getField(InternedString name) const {
+        return fields.get(name);
+    }
+
+    void Instance::setField(InternedString name, Value v) {
+        fields.insert(name, v);
+    }
 }

@@ -759,3 +759,7 @@ fun vectorAdd(vec1, vec2){
 }
 
 ```
+
+# Chapter 26
+
+I'm not going to do GC, as I'm reference counting everything. Cycle detection would not work, but I wasn't planning on it without dealing with weak ptrs. 
