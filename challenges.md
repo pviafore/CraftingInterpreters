@@ -713,3 +713,49 @@ See code
 4. Define more native functions
 
 Added random()
+
+# chapter 25
+
+1.  Only wrap functions that need upvalues
+
+See code with abstracting over a callable.
+
+2. Should we close over the loop value?
+
+I think we should, as I favor limiting footguns (despite the fact that I wrote this in c++, of course). See the code for implementation.
+See the code for a for loop.
+
+3. Write closures that simulate a 2-d vector. A constructor, accessors, and adders.
+
+```
+var __vector_x = 0;
+var __vector_y = 0;
+
+fun newVector(x, y) { 
+    fun inner() {
+        __vector_x = x;
+        __vector_y = y;
+    }
+
+    return inner;
+}
+
+fun vectorX(vec) {
+    vec();
+    return __vector_x;
+}
+
+fun vectorY(vec) { 
+    vec();
+    return __vector_y;
+}
+
+fun vectorAdd(vec1, vec2){
+    vec1();
+    var x = __vector_x;
+    var y = __vector_y;
+    vec2();
+    return newVector(x + __vector_x, y + __vector_y);
+}
+
+```

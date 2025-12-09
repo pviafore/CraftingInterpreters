@@ -34,7 +34,7 @@ namespace lox {
             return _value;
         }
 
-        operator bool() const {
+        explicit operator bool() const {
             return _hasValue;
         }
 

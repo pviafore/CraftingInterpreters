@@ -12,6 +12,10 @@ namespace lox {
         return name;
     }
 
+    void Function::setName(StringView name) {
+        this->name = name;
+    }
+
     void Function::increaseArity() {
         if (arity == 255) {
             throw Exception("Can't have more than 255 parameters", nullptr);

@@ -56,7 +56,7 @@ namespace lox {
     }
 
     inline bool isNumber(Value value) {
-        return std::holds_alternative<InternedString>(value);
+        return std::holds_alternative<double>(value);
     }
     inline bool isFunction(Value value) {
         return std::holds_alternative<SharedPtr<Function>>(value);

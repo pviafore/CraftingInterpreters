@@ -85,7 +85,7 @@ namespace lox {
         size_t emitJump(OpCode opCode);
         void patchJump(size_t pos);
         void expressionStatement();
-        void varDeclaration(bool constant = false);
+        StringView varDeclaration(bool constant = false);
         void constDeclaration();
         void funDeclaration();
         void variable(bool);
@@ -119,6 +119,7 @@ namespace lox {
         StaticVector<Local, 1024> locals;
         size_t localCount = 0;
         size_t depth = 0;
+
         size_t onceTracker = 0;
         size_t numberOfOnces = 0;
 

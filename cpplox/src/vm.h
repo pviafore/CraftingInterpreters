@@ -17,17 +17,20 @@ namespace lox {
         CompileError = 65,
         RuntimeError = 70
     };
+
+    using Callable = std::variant<SharedPtr<Function>, SharedPtr<Closure>>;
+
+    SharedPtr<Function> getFunction(Callable callable);
     class VM {
     public:
         VM();
         InterpretResult interpret(const String& string);
         InterpretResult run();
 
-        bool diagnosticMode = false;
-
+        bool diagnosticMode = true;
         struct CallFrame {
         public:
-            CallFrame(SharedPtr<Closure> f, DynamicStack<Value>& stack, size_t offset = 0) : function(f), instructionPtr(function->getFunction()->getChunk()->begin()), slots(&stack), offset(offset) {}
+            CallFrame(Callable f, DynamicStack<Value>& stack, size_t offset = 0) : function(f), instructionPtr(lox::getFunction(f)->getChunk()->begin()), slots(&stack), offset(offset) {}
             Chunk::InstructionIterator& getIp() {
                 return instructionPtr;
             }
@@ -44,8 +47,12 @@ namespace lox {
                 (*slots)[index + offset] = value;
             }
 
-            SharedPtr<Closure> getFunction() const {
+            Callable getCallable() const {
                 return function;
+            }
+
+            SharedPtr<Function> getFunction() const {
+                return lox::getFunction(function);
             }
 
             size_t getOffset() const {
@@ -53,7 +60,7 @@ namespace lox {
             }
 
         private:
-            SharedPtr<Closure> function;
+            Callable function;
             Chunk::InstructionIterator instructionPtr;
             DynamicStack<Value>* slots;
             size_t offset;
@@ -75,7 +82,7 @@ namespace lox {
         void pushLocal(size_t constant);
         void assignLocal(size_t constant);
         void callValue(Value callee, int argCount);
-        void call(SharedPtr<Closure> func, size_t argCount);
+        void call(Callable func, size_t argCount);
         double popNumber();
         void binaryOp(const Binary& bin);
         DynamicStack<Value> stack;

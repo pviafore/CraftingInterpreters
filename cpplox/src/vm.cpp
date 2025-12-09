@@ -11,6 +11,9 @@
 namespace lox {
     const size_t FRAMES_MAX = 64;
 
+    SharedPtr<Function> getFunction(Callable callable) {
+        return std::holds_alternative<SharedPtr<Function>>(callable) ? std::get<SharedPtr<Function>>(callable) : std::get<SharedPtr<Closure>>(callable)->getFunction();
+    }
     Expected<Value, String> clockNative(Span<Value>) {
         return Value{double(std::chrono::steady_clock::now().time_since_epoch().count())};
     }
@@ -45,7 +48,7 @@ namespace lox {
         }
         auto closure = SharedPtr<Closure>::Make(function);
         stack.push(closure);
-        call(closure, 0);
+        call(Callable{closure}, 0);
         return run();
     }
 
@@ -61,8 +64,8 @@ namespace lox {
     InterpretResult VM::run() {
         Optional<InterpretResult> returnCode;
         try {
-            while (!frames.empty() && frames.top().getIp() != frames.top().getFunction()->getFunction()->getChunk()->end()) {
-                const auto& chunk = **frames.top().getFunction()->getFunction()->getChunk();
+            while (!frames.empty() && frames.top().getIp() != frames.top().getFunction()->getChunk()->end()) {
+                const auto& chunk = **frames.top().getFunction()->getChunk();
                 auto& ip = frames.top().getIp();
                 if (diagnosticMode) {
                     std::println("{}", stack);
@@ -94,7 +97,7 @@ namespace lox {
                                 if (upvalue.isLocal) {
                                     closure->addUpValue(captureUpValue(stack.begin() + frames.top().getOffset() + upvalue.index));
                                 } else {
-                                    auto sp = frames.top().getFunction()->getUpValue(upvalue.index);
+                                    auto sp = std::get<SharedPtr<Closure>>(frames.top().getCallable())->getUpValue(upvalue.index);
                                     closure->addUpValue(sp);
                                 }
                             }
@@ -111,8 +114,8 @@ namespace lox {
                         [&chunk, &returnCode, this](const LongGetGlobal& g) { returnCode = pushGlobal(chunk, g.value()); },
                         [&chunk, &returnCode, this](const GetLocal& g) { pushLocal(g.value()); },
                         [&chunk, &returnCode, this](const SetLocal& s) { assignLocal(s.value()); },
-                        [&chunk, &returnCode, this](const GetUpValue& g) { stack.push(*frames.top().getFunction()->getUpValue(g.value())->location); },
-                        [&chunk, &returnCode, this](const SetUpValue& s) { frames.top().getFunction()->setUpValue(s.value(), stack.peek()); },
+                        [&chunk, &returnCode, this](const GetUpValue& g) { stack.push(*(std::get<SharedPtr<Closure>>(frames.top().getCallable())->getUpValue(g.value())->location)); },
+                        [&chunk, &returnCode, this](const SetUpValue& s) { std::get<SharedPtr<Closure>>(frames.top().getCallable())->setUpValue(s.value(), stack.peek()); },
                         [&ip, &jumped, this](const JumpIfFalse& j) { if (isFalsey(stack.peek())) { ip += j.value(); jumped = true;} },
                         [&ip, &jumped, this](const Jump& j) { ip += j.value(); jumped = true; },
                         [&ip, &jumped, this](const Loop& l) { ip.resetBy(l.value()); jumped = true; },
@@ -152,7 +155,7 @@ namespace lox {
         } catch (lox::Exception& e) {
             std::println(std::cerr, "Error: {}", e.what());
             for (auto f : views::reversed<DynamicStack<CallFrame>>(frames)) {
-                std::println(std::cerr, "[Line {} in {}]", f.getFunction()->getFunction()->getChunk()->getLineNumber(f.getIp()->offset()), f.getFunction()->getFunction()->getName());
+                std::println(std::cerr, "[Line {} in {}]", f.getFunction()->getChunk()->getLineNumber(f.getIp()->offset()), f.getFunction()->getName());
             }
             while (!frames.empty()) {
                 frames.pop();
@@ -260,6 +263,7 @@ namespace lox {
         std::visit(
             overload{
                 [this, argCount](SharedPtr<Closure> func) { call(func, argCount); },
+                [this, argCount](SharedPtr<Function> func) { call(func, argCount); },
                 [this, argCount](SharedPtr<NativeFunction> func) {
                     auto result = func->invoke(argCount, Span(stack.begin() + stack.size() - argCount, argCount));
                     for (auto i = 0; i < argCount; i++) {
@@ -276,9 +280,9 @@ namespace lox {
             callee);
     }
 
-    void VM::call(SharedPtr<Closure> func, size_t argCount) {
-        if (argCount != func->getFunction()->getArity()) {
-            throw Exception(std::format("Expected {} arguments but got {}.", func->getFunction()->getArity(), argCount).c_str(), nullptr);
+    void VM::call(Callable func, size_t argCount) {
+        if (argCount != lox::getFunction(func)->getArity()) {
+            throw Exception(std::format("Expected {} arguments but got {}.", lox::getFunction(func)->getArity(), argCount).c_str(), nullptr);
         }
         if (frames.size() == FRAMES_MAX) {
             throw Exception("Stack overflow.", nullptr);

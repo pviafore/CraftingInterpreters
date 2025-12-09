@@ -11,10 +11,11 @@ namespace lox {
         const StringView SwitchCondition = "1__SwitchCondition__";
         const StringView OnceTracker = "2__OnceTracker__";
         const StringView ProgramState = "3__ProgramState__";
+        const StringView ForStatement = "4__ForStatement";
     }
 
     Compiler::Compiler(const String& s) : scanner(s), parser(SharedPtr<Parser>::Make(scanner.begin())), function(SharedPtr<Function>::Make("<script>")), functionType(FunctionType::SCRIPT) {}
-    Compiler::Compiler(Compiler* enclosing) : scanner(nullptr), parser(enclosing->parser), function(SharedPtr<Function>::Make(parser->getPreviousToken().token)), functionType(FunctionType::FUNCTION), enclosing(enclosing) {
+    Compiler::Compiler(Compiler* enclosing) : debugMode(enclosing->debugMode), scanner(nullptr), parser(enclosing->parser), depth(enclosing->depth + 1), function(SharedPtr<Function>::Make(parser->getPreviousToken().token)), functionType(FunctionType::FUNCTION), enclosing(enclosing) {
     }
     void Compiler::beginCompile() {
         addLocal(ReservedInternal::ProgramState, false);  // the function that is being called pushed by VM
@@ -23,7 +24,6 @@ namespace lox {
     void Compiler::setupOnceTracking() {
         emitConstant(0.0);  // for onces
         onceTracker = addLocal(ReservedInternal::OnceTracker, false);
-        getCurrentChunk()->writeOpAndIndex(OpCode::SetLocal, OpCode::SetLocal, onceTracker, parser->getPreviousToken().line);
     }
     SharedPtr<Function> Compiler::compile() {
         beginCompile();
@@ -342,7 +342,7 @@ namespace lox {
     void Compiler::endScope() {
         depth--;
 
-        while (locals.size() > 0 && locals.back().depth > depth) {
+        while (locals.size() > 0 && locals.back().depth && locals.back().depth.value() > depth) {
             auto opcode = (locals.back().isCaptured) ? OpCode::CloseUpValue : OpCode::Pop;
             emit(opcode);
             locals.pop_back();
@@ -395,10 +395,11 @@ namespace lox {
         beginScope();
         nestedLoops.push_back(Loop{depth});
         parser->consume(TokenType::LeftParen, "Expect (' after 'for'. ");
+        StringView name;
         if (parser->match(TokenType::Semicolon)) {
             // no initializer
         } else if (parser->match(TokenType::Var)) {
-            varDeclaration();
+            name = varDeclaration();
         } else {
             expressionStatement();
         }
@@ -423,8 +424,45 @@ namespace lox {
             loopStart = incrementStart;
             patchJump(bodyJump);
         }
+        Compiler compiler(this);
+        compiler.beginScope();
+        compiler.beginCompile();
+        compiler.addLocal(name, true);
+        compiler.markInitialized();
+        compiler.setupOnceTracking();
+        compiler.statement();
+        auto f = compiler.endCompile();
+        compiler.endScope();
+        if (!f) {
+            return;
+        }
+        f->setName(ReservedInternal::ForStatement);
+        if (name.size()) {
+            f->increaseArity();
 
-        statement();
+            emit(OpCode::Closure);
+
+            size_t index = this->function->getChunk()->addConstant(f);
+            if (index >= 255) {
+                parser->errorAtPrevious("Too many constants");
+            }
+            emit(uint8_t(index & 0xFF));
+            for (auto upvalue : f->getUpvalues()) {
+                emit(upvalue.isLocal ? 1 : 0);
+                emit((std::byte)upvalue.index);
+            }
+
+            auto local = resolveLocal(name);
+            getCurrentChunk()->writeOpAndIndex(OpCode::GetLocal, OpCode::GetLocal, local.value(), parser->getPreviousToken().line);
+
+            emit(OpCode::Call);
+            emit(1);
+        } else {
+            emitConstant(f);
+            emit(OpCode::Call);
+            emit(0);
+        }
+        emit(OpCode::Pop);
         emitLoop(loopStart);
 
         if (exitJump.has_value()) {
@@ -494,7 +532,7 @@ namespace lox {
         parser->consume(TokenType::Semicolon, "Expect ';' after value");
 
         int local = locals.size() - 1;
-        while (local >= 0 && locals[local].depth > nestedLoops[nestedLoops.size() - 1].depth) {
+        while (local >= 0 && locals[local].depth.value() > nestedLoops[nestedLoops.size() - 1].depth) {
             emit(OpCode::Pop);
             local--;
         }
@@ -509,7 +547,7 @@ namespace lox {
         }
         parser->consume(TokenType::Semicolon, "Expect ';' after value");
         int local = locals.size() - 1;
-        while (local >= 0 && locals[local].depth > nestedLoops[nestedLoops.size() - 1].depth) {
+        while (local >= 0 && locals[local].depth.value() > nestedLoops[nestedLoops.size() - 1].depth) {
             emit(OpCode::Pop);
             local--;
         }
@@ -664,9 +702,9 @@ namespace lox {
         return function->addUpvalue(index, isLocal);
     }
 
-    void Compiler::varDeclaration(bool constant) {
+    StringView Compiler::varDeclaration(bool constant) {
         auto global = parseVariable("Expect variable name", constant);
-
+        auto name = parser->getPreviousToken();
         if (parser->match(TokenType::Equal)) {
             expression();
         } else {
@@ -675,6 +713,7 @@ namespace lox {
 
         parser->consume(TokenType::Semicolon, "Expect ';' after variable declaration.");
         defineVariable(global);
+        return name.token;
     }
 
     void Compiler::constDeclaration() {
@@ -707,12 +746,20 @@ namespace lox {
         compiler.block();
 
         auto function = compiler.endCompile();
-        emit(OpCode::Closure);
-        size_t index = this->function->getChunk()->addConstant(function);
-        if (index >= 255) {
-            parser->errorAtPrevious("Too many constants");
+        if (!function) {
+            return;
         }
-        emit(uint8_t(index & 0xFF));
+        if (function->getUpValueCount()) {
+            emit(OpCode::Closure);
+
+            size_t index = this->function->getChunk()->addConstant(function);
+            if (index >= 255) {
+                parser->errorAtPrevious("Too many constants");
+            }
+            emit(uint8_t(index & 0xFF));
+        } else {
+            emitConstant(function);
+        }
         for (auto& upvalue : function->getUpvalues()) {
             emit(upvalue.isLocal ? 1 : 0);
             emit(upvalue.index);
@@ -775,6 +822,9 @@ namespace lox {
             locals.push_back({name, {}, constant});
         } catch (std::runtime_error&) {
             parser->errorAtCurrent("Too many local variables in function");
+        }
+        if (debugMode) {
+            std::println("{} is added at {}", name, locals.size() - 1);
         }
         return locals.size() - 1;
     }

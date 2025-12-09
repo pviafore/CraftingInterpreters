@@ -22,6 +22,7 @@ namespace lox {
             return &f1 == &f2;
         }
 
+        void setName(StringView name);
         void increaseArity();
         size_t addUpvalue(size_t index, bool isLocal);
         Optional<size_t> getUpvalue(size_t index, bool isLocal);

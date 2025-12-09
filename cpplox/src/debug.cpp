@@ -69,6 +69,7 @@ namespace lox {
             [&out](auto i) { out << i.name; },
         };
         std::visit(overloads, inst);
-        out << "\n";
+        out << "\n"
+            << std::flush;
     }
 }

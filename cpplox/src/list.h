@@ -58,7 +58,7 @@ public:
             return nullptr;
         }
         auto node = first;
-        while (node->value < value) {
+        while (node && node->value < value) {
             node = node->next;
         }
         return node;
