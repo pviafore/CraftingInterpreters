@@ -95,6 +95,8 @@ namespace lox {
         StringView getName() const;
         Optional<Value> getField(InternedString) const;
         void setField(InternedString s, Value v);
+        bool hasField(InternedString s) const;
+        void deleteField(InternedString s);
 
     private:
         SharedPtr<Class> cls;

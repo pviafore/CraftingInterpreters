@@ -763,3 +763,25 @@ fun vectorAdd(vec1, vec2){
 # Chapter 26
 
 I'm not going to do GC, as I'm reference counting everything. Cycle detection would not work, but I wasn't planning on it without dealing with weak ptrs. 
+
+# Chapter 27
+
+1.  How do other languages handle checking the existence of a field?
+
+In dynamic languagues: Python has the hasattr function (I'm going to do something similar), PHP just creates the variable (I hate this), Ruby has a instance_variable_defined? method, and Lua just has a field as nil.
+
+I'm going to create native functions for hasfield, setfield, and deletefield (which covers sections 2 and 3 as well)
+
+2.  Create a setattr 
+
+See #1
+
+3.  Create a way to delete a field
+
+See #1
+
+4.  How can you be more efficient in accessing field names.
+
+I'm going to guess slots, but let's see what Google can tell us. It seems like there are some caching options to eliminate the hashing. I think what I like the most is 
+JavaScripts creating a hidden shape and offset calculation to just do offsets right into the object
+

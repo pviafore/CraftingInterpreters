@@ -18,6 +18,51 @@ namespace lox {
         return Value{double(std::chrono::steady_clock::now().time_since_epoch().count())};
     }
 
+    Expected<Value, String> hasfieldNative(Span<Value> values) {
+        if (values.size() != 2) {
+            return String("Must have three arguments");
+        }
+        auto val1 = *values.begin();
+        auto val2 = *(values.begin() + 1);
+        if (!std::holds_alternative<SharedPtr<Instance>>(val1) && !std::holds_alternative<InternedString>(val2)) {
+            return String{"Must pass in an instance and field name"};
+        }
+        auto instance = std::get<SharedPtr<Instance>>(val1);
+        auto fieldName = std::get<InternedString>(val2);
+        return Value{instance->hasField(fieldName)};
+    }
+
+    Expected<Value, String> setfieldNative(Span<Value> values) {
+        if (values.size() != 3) {
+            return String("Must have three arguments");
+        }
+        auto val1 = *values.begin();
+        auto val2 = *(values.begin() + 1);
+        auto val3 = *(values.begin() + 2);
+        if (!std::holds_alternative<SharedPtr<Instance>>(val1) && !std::holds_alternative<InternedString>(val2)) {
+            return String{"Must pass in an instance and field name"};
+        }
+        auto instance = std::get<SharedPtr<Instance>>(val1);
+        auto fieldName = std::get<InternedString>(val2);
+        instance->setField(fieldName, val3);
+        return Value{nullptr};
+    }
+
+    Expected<Value, String> deletefieldNative(Span<Value> values) {
+        if (values.size() != 2) {
+            return String("Must have three arguments");
+        }
+        auto val1 = *values.begin();
+        auto val2 = *(values.begin() + 1);
+        if (!std::holds_alternative<SharedPtr<Instance>>(val1) && !std::holds_alternative<InternedString>(val2)) {
+            return String{"Must pass in an instance and field name"};
+        }
+        auto instance = std::get<SharedPtr<Instance>>(val1);
+        auto fieldName = std::get<InternedString>(val2);
+        instance->deleteField(fieldName);
+        return Value{nullptr};
+    }
+
     Expected<Value, String> random(Span<Value> values) {
         if (values.size() != 2) {
             return String{"Must have two arguments"};
@@ -38,6 +83,9 @@ namespace lox {
     VM::VM() {
         defineNative("clock", clockNative, 0);
         defineNative("random", random, 2);
+        defineNative("hasfield", hasfieldNative, 2);
+        defineNative("deletefield", deletefieldNative, 2);
+        defineNative("setfield", setfieldNative, 3);
     }
     InterpretResult VM::interpret(const String& s) {
         Compiler compiler(s);

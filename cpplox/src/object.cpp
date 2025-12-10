@@ -88,4 +88,12 @@ namespace lox {
     void Instance::setField(InternedString name, Value v) {
         fields.insert(name, v);
     }
+
+    bool Instance::hasField(InternedString name) const {
+        return fields.get(name).hasValue();
+    }
+
+    void Instance::deleteField(InternedString name) {
+        fields.erase(name);
+    }
 }
