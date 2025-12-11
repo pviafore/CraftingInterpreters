@@ -42,6 +42,10 @@ namespace lox {
             return GetGlobal{buffer};
         case OpCode::LongGetGlobal:
             return LongGetGlobal{buffer};
+        case OpCode::Invoke:
+            return Invoke{buffer};
+        case OpCode::Method:
+            return MethodOp{buffer};
         case OpCode::SetGlobal:
             return SetGlobal(buffer);
         case OpCode::LongSetGlobal:

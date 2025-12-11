@@ -11,9 +11,6 @@
 namespace lox {
     const size_t FRAMES_MAX = 64;
 
-    SharedPtr<Function> getFunction(Callable callable) {
-        return std::holds_alternative<SharedPtr<Function>>(callable) ? std::get<SharedPtr<Function>>(callable) : std::get<SharedPtr<Closure>>(callable)->getFunction();
-    }
     Expected<Value, String> clockNative(Span<Value>) {
         return Value{double(std::chrono::steady_clock::now().time_since_epoch().count())};
     }
@@ -175,8 +172,7 @@ namespace lox {
                                 stack.pop();
                                 stack.push(value.value());
                             } else {
-                                std::string s = std::format("Undefined property {}", name);
-                                throw Exception(s.c_str(), nullptr);
+                                bindMethod(instance->getClass(), name);
                             }
                         },
                         [&chunk, &returnCode, this](const SetProperty& s) {
@@ -193,10 +189,21 @@ namespace lox {
                         },
                         [&chunk, &returnCode, this](const GetUpValue& g) { stack.push(*(std::get<SharedPtr<Closure>>(frames.top().getCallable())->getUpValue(g.value())->location)); },
                         [&chunk, &returnCode, this](const SetUpValue& s) { std::get<SharedPtr<Closure>>(frames.top().getCallable())->setUpValue(s.value(), stack.peek()); },
-                        [&ip, &jumped, this](const JumpIfFalse& j) { if (isFalsey(stack.peek())) { ip += j.value(); jumped = true;} },
-                        [&ip, &jumped, this](const Jump& j) { ip += j.value(); jumped = true; },
-                        [&ip, &jumped, this](const Loop& l) { ip.resetBy(l.value()); jumped = true; },
-                        [this](const Negate&) { this->negate(); },
+                        [&ip, &jumped, this](const JumpIfFalse& j) {
+                            if (isFalsey(stack.peek())) {
+                                ip += j.value();
+                                jumped = true;
+                            } },
+                        [&ip, &jumped, this](const Jump& j) {
+                            ip += j.value();
+                            jumped = true; },
+                        [&ip, &jumped, this](const Loop& l) {
+                            ip.resetBy(l.value());
+                            jumped = true; },
+                        [&chunk, this](const MethodOp& m) { defineMethod(std::get<InternedString>(chunk.getConstant(m.value()))); },
+                        [this](const Negate&) {
+                            this->negate();
+                        },
                         [this](const Print&) { std::println("{}", stack.pop()); },
                         [this](const Pop&) { stack.pop(); },
                         [this](const CloseUpValue&) { closeUpValues(stack.begin() + stack.size() - 1); stack.pop(); },
@@ -219,6 +226,10 @@ namespace lox {
                         [&chunk, &returnCode, this](const SetGlobal& g) { returnCode = assignGlobal(chunk, g.value()); },
                         [&chunk, &returnCode, this](const LongSetGlobal& g) { returnCode = assignGlobal(chunk, g.value()); },
                         [this](const True&) { stack.push(true); },
+                        [this, &chunk](const Invoke& i) {
+                            auto name = chunk.getConstant(i.value());
+                            invoke(std::get<InternedString>(name), i.getArgumentCount());
+                        },
                         [&returnCode](const Unknown&) { returnCode = InterpretResult::CompileError; }},
                     instruction.instruction());
 
@@ -341,7 +352,14 @@ namespace lox {
             overload{
                 [this, argCount](SharedPtr<Closure> func) { call(func, argCount); },
                 [this, argCount](SharedPtr<Function> func) { call(func, argCount); },
-                [this, argCount](SharedPtr<Class> cls) { stack[stack.size() - argCount - 1] = SharedPtr<Instance>::Make(cls); },
+                [this, argCount](SharedPtr<Class> cls) {
+                    stack[stack.size() - argCount - 1] = SharedPtr<Instance>::Make(cls);
+                    auto init = cls->getMethod(InternedString{StringView("init")});
+                    if (init.hasValue()) {
+                        call(getFunction(toCallable(init.value())), argCount);
+                    }
+                },
+                [this, argCount](SharedPtr<BoundMethod> method) { stack[stack.size() - argCount - 1] = method->getReceiver(); call(method->getMethod(), argCount); },
                 [this, argCount](SharedPtr<NativeFunction> func) {
                     auto result = func->invoke(argCount, Span(stack.begin() + stack.size() - argCount, argCount));
                     for (auto i = 0; i < argCount; i++) {
@@ -381,5 +399,52 @@ namespace lox {
             upvalue->close();
             openUpValues.popFront();
         }
+    }
+
+    void VM::defineMethod(InternedString name) {
+        auto method = stack.peek();
+        auto cls = std::get<SharedPtr<Class>>(stack.peek(1));
+        cls->setMethod(name, method);
+        stack.pop();
+    }
+
+    void VM::bindMethod(SharedPtr<Class> cls, InternedString name) {
+        auto value = cls->getMethod(name);
+        if (!value) {
+            auto s = std::format("Undefined property {}", name);
+            throw Exception(s.c_str(), nullptr);
+        }
+
+        SharedPtr<BoundMethod> method = std::visit(
+            overload{
+                [this](SharedPtr<Function>& f) { return SharedPtr<BoundMethod>::Make(stack.peek(), Callable{f}); },
+                [this](SharedPtr<Closure>& f) { return SharedPtr<BoundMethod>::Make(stack.peek(), Callable{f}); },
+                [](auto) -> SharedPtr<BoundMethod> { throw Exception("Not callable", nullptr); return nullptr; }},
+            value.value());
+        stack.pop();
+        stack.push(method);
+    }
+
+    void VM::invoke(InternedString name, uint8_t argCount) {
+        auto value = stack.peek(argCount);
+        if (!std::holds_alternative<SharedPtr<Instance>>(value)) {
+            throw Exception("Only instances have methods.", nullptr);
+        }
+        auto receiver = std::get<SharedPtr<Instance>>(value);
+        auto v = receiver->getField(name);
+        if (v.hasValue()) {
+            stack[stack.size() - argCount - 1] = v.value();
+            return callValue(v.value(), argCount);
+        }
+        return invokeFromClass(receiver->getClass(), name, argCount);
+    }
+
+    void VM::invokeFromClass(SharedPtr<Class> cls, InternedString name, uint8_t argCount) {
+        auto method = cls->getMethod(name);
+        if (!method.hasValue()) {
+            auto s = std::format("Undefined property {}", name);
+            throw Exception(s.c_str(), nullptr);
+        }
+        return call(toCallable(method.value()), argCount);
     }
 }

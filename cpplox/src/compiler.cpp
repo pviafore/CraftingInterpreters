@@ -15,15 +15,18 @@ namespace lox {
     }
 
     Compiler::Compiler(const String& s) : scanner(s), parser(SharedPtr<Parser>::Make(scanner.begin())), function(SharedPtr<Function>::Make("<script>")), functionType(FunctionType::SCRIPT) {}
-    Compiler::Compiler(Compiler* enclosing) : debugMode(enclosing->debugMode), scanner(nullptr), parser(enclosing->parser), depth(enclosing->depth + 1), function(SharedPtr<Function>::Make(parser->getPreviousToken().token)), functionType(FunctionType::FUNCTION), enclosing(enclosing) {
+    Compiler::Compiler(Compiler* enclosing, FunctionType type) : debugMode(enclosing->debugMode), scanner(nullptr), parser(enclosing->parser), depth(enclosing->depth + 1), function(SharedPtr<Function>::Make(parser->getPreviousToken().token)), functionType(type), enclosing(enclosing), classCompiler(enclosing->classCompiler) {
     }
     void Compiler::beginCompile() {
-        addLocal(ReservedInternal::ProgramState, false);  // the function that is being called pushed by VM
+        StringView name = (functionType != FunctionType::FUNCTION ? "this" : ReservedInternal::ProgramState);
+        addLocal(name, false);  // the function that is being called pushed by VM
+        markInitialized();
     }
 
     void Compiler::setupOnceTracking() {
         emitConstant(0.0);  // for onces
         onceTracker = addLocal(ReservedInternal::OnceTracker, false);
+        markInitialized();
     }
     SharedPtr<Function> Compiler::compile() {
         beginCompile();
@@ -51,7 +54,11 @@ namespace lox {
     }
 
     void Compiler::emitReturn() {
-        emit(OpCode::Nil);
+        if (functionType == FunctionType::INITIALIZER) {
+            getCurrentChunk()->writeOpAndIndex(OpCode::GetLocal, OpCode::GetLocal, 0, parser->getPreviousToken().line);
+        } else {
+            emit(OpCode::Nil);
+        }
         function->getChunk()->write(OpCode::Return, parser->getPreviousToken().line);
     }
 
@@ -156,10 +163,16 @@ namespace lox {
         if (canAssign && parser->match(TokenType::Equal)) {
             expression();
             emit(OpCode::SetProperty);
+            emit(constant);
+        } else if (parser->match(TokenType::LeftParen)) {
+            auto argCount = argumentList();
+            emit(OpCode::Invoke);
+            emit(constant);
+            emit(argCount);
         } else {
             emit(OpCode::GetProperty);
+            emit(constant);
         }
-        emit(constant);
     }
 
     void Compiler::binary(bool) {
@@ -271,6 +284,7 @@ namespace lox {
             {TokenType::False, {&Compiler::literal}},
             {TokenType::True, {&Compiler::literal}},
             {TokenType::Nil, {&Compiler::literal}},
+            {TokenType::This, {&Compiler::this_}},
             {TokenType::Question, {{}, &Compiler::ternary, Precedence::Ternary}}};
 
         auto iter = rules.find(type);
@@ -439,7 +453,7 @@ namespace lox {
             loopStart = incrementStart;
             patchJump(bodyJump);
         }
-        Compiler compiler(this);
+        Compiler compiler(this, functionType);
         compiler.beginScope();
         compiler.beginCompile();
         compiler.addLocal(name, true);
@@ -604,6 +618,9 @@ namespace lox {
         if (parser->match(TokenType::Semicolon)) {
             emitReturn();
         } else {
+            if (functionType == FunctionType::INITIALIZER) {
+                throw Exception("Cannot return a value from an initializer", nullptr);
+            }
             expression();
             parser->consume(TokenType::Semicolon, "Expected semicolon after return value");
             emit(OpCode::Return);
@@ -737,6 +754,7 @@ namespace lox {
 
     void Compiler::classDeclaration() {
         parser->consume(TokenType::Identifier, "Expect class name.");
+        auto token = parser->getPreviousToken();
         auto constant = addIdentifierConstant(parser->getPreviousToken().token, true);
         declareVariable(true);
 
@@ -744,8 +762,31 @@ namespace lox {
         emit(constant);
         defineVariable(constant);
 
+        ClassCompiler compiler;
+        compiler.enclosing = classCompiler;
+        classCompiler = &compiler;
+        emitNamedVariable(token.token, false);
+
         parser->consume(TokenType::LeftBrace, "Expect '{' before class body}");
+        while (!parser->check(TokenType::RightBrace) && !parser->check(TokenType::Eof)) {
+            method();
+        }
         parser->consume(TokenType::RightBrace, "Expect '}' after class body}");
+        emit(OpCode::Pop);
+        classCompiler = classCompiler->enclosing;
+    }
+
+    void Compiler::method() {
+        parser->consume(TokenType::Identifier, "Expect method name");
+        auto constant = addIdentifierConstant(parser->getPreviousToken().token, true);
+        FunctionType type = FunctionType::METHOD;
+        if (parser->getPreviousToken().token == "init") {
+            type = FunctionType::INITIALIZER;
+        }
+
+        func(type);
+        emit(OpCode::Method);
+        emit(constant);
     }
 
     void Compiler::funDeclaration() {
@@ -755,8 +796,8 @@ namespace lox {
         defineVariable(global);
     }
 
-    void Compiler::func(FunctionType) {
-        Compiler compiler(this);
+    void Compiler::func(FunctionType type) {
+        Compiler compiler(this, type);
         compiler.debugMode = debugMode;
         compiler.beginCompile();
         compiler.beginScope();
@@ -855,5 +896,13 @@ namespace lox {
             std::println("{} is added at {}", name, locals.size() - 1);
         }
         return locals.size() - 1;
+    }
+
+    void Compiler::this_(bool) {
+        if (!classCompiler) {
+            parser->errorAtPrevious("Can't use 'this' outside of a class");
+            return;
+        }
+        variable(false);
     }
 }

@@ -18,9 +18,21 @@ namespace lox {
     struct UpValueObj;
     class Class;
     class Instance;
+    class BoundMethod;
     using Value = std::variant<bool, std::nullptr_t, double, InternedString, SharedPtr<Function>, SharedPtr<NativeFunction>,
-                               SharedPtr<Closure>, SharedPtr<UpValueObj>, SharedPtr<Class>, SharedPtr<Instance>>;
+                               SharedPtr<Closure>, SharedPtr<UpValueObj>, SharedPtr<Class>, SharedPtr<Instance>, SharedPtr<BoundMethod>>;
 
+    using Callable = std::variant<SharedPtr<Function>, SharedPtr<Closure>>;
+
+    inline Callable toCallable(Value v) {
+        if (std::holds_alternative<SharedPtr<Function>>(v)) {
+            return std::get<SharedPtr<Function>>(v);
+        }
+        if (std::holds_alternative<SharedPtr<Closure>>(v)) {
+            return std::get<SharedPtr<Closure>>(v);
+        }
+        throw Exception("Is not a callable", nullptr);
+    }
     struct UpValueObj {
         Value* location;
         Value closed = nullptr;
@@ -84,9 +96,12 @@ namespace lox {
         Class(InternedString name);
 
         StringView getName() const;
+        void setMethod(InternedString name, Value method);
+        Optional<Value> getMethod(InternedString name) const;
 
     private:
         InternedString name;
+        Table<InternedString, Value> methods;
     };
 
     class Instance {
@@ -97,11 +112,27 @@ namespace lox {
         void setField(InternedString s, Value v);
         bool hasField(InternedString s) const;
         void deleteField(InternedString s);
+        SharedPtr<Class> getClass() const;
 
     private:
         SharedPtr<Class> cls;
         Table<InternedString, Value> fields;
     };
+
+    class BoundMethod {
+    public:
+        BoundMethod(Value receiver, Callable method);
+        Callable getMethod() const;
+        Value getReceiver() const;
+
+    private:
+        Value receiver;
+        Callable method;
+    };
+
+    inline SharedPtr<Function> getFunction(Callable callable) {
+        return std::holds_alternative<SharedPtr<Function>>(callable) ? std::get<SharedPtr<Function>>(callable) : std::get<SharedPtr<Closure>>(callable)->getFunction();
+    }
 }
 
 template <class... Ts>
@@ -127,6 +158,7 @@ struct std::formatter<lox::Value> : std::formatter<std::string> {
                 [&ctx](lox::SharedPtr<lox::Function> f) { return std::string(f->getName().str().c_str()); },
                 [&ctx](lox::SharedPtr<lox::Class> c) { return std::string(c->getName().str().c_str()); },
                 [&ctx](lox::SharedPtr<lox::Instance> i) { return std::string(i->getName().str().c_str()) + " instance"s; },
+                [&ctx](lox::SharedPtr<lox::BoundMethod> b) { return std::string(lox::getFunction(b->getMethod())->getName().str().c_str()) + " method"s; },
                 [&ctx](lox::SharedPtr<lox::Closure> f) { return std::string(f->getFunction()->getName().str().c_str()); },
                 [&ctx](lox::SharedPtr<lox::NativeFunction>) { return "<native fn>"s; },
                 [&ctx](lox::SharedPtr<lox::UpValueObj> v) { return std::format("{}", *(v->location)); }},

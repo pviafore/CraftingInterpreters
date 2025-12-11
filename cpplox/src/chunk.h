@@ -28,6 +28,8 @@ namespace lox {
         GetLocal,
         GetUpValue,
         LongGetGlobal,
+        Invoke,
+        Method,
         GetProperty,
         SetProperty,
         Greater,
@@ -104,11 +106,29 @@ namespace lox {
     private:
         std::vector<Function::UpValue> upvalues;
     };
+
+    class Invoke : public _OpAndValueInstruction<uint8_t> {
+    public:
+        Invoke(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Invoke, "OP_INVOKE"), argCount(uint8_t(*(buffer + 2))) {
+            size = 3;
+        }
+        uint8_t getArgumentCount() const {
+            return argCount;
+        }
+
+    private:
+        uint8_t argCount;
+    };
+
     class Constant : public _OpAndValueInstruction<uint8_t> {
     public:
         Constant(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Constant, "OP_CONSTANT") {}
     };
 
+    class MethodOp : public _OpAndValueInstruction<uint8_t> {
+    public:
+        MethodOp(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Method, "OP_METHOD") {}
+    };
     uint32_t toAddress(const std::byte* buffer);
     class LongConstant : public _OpAndValueInstruction<uint32_t> {
     public:
@@ -322,8 +342,8 @@ namespace lox {
         Instruction& operator=(Instruction&& rhs) = default;
 
         using InstVariant = std::variant<Binary, BinaryPredicate, Call, ClassOp, ClosureOp, Constant, DefineGlobal, GetGlobal, Equal, False, LongConstant,
-                                         LongDefineGlobal, LongGetGlobal, Negate, Nil, Not, Print, Pop, Return, SetGlobal, LongSetGlobal, GetLocal,
-                                         SetLocal, GetUpValue, SetUpValue, JumpIfFalse, Jump, Loop, True, CloseUpValue, GetProperty, SetProperty, Unknown>;
+                                         LongDefineGlobal, LongGetGlobal, Negate, Nil, Not, Print, Pop, Return, MethodOp, SetGlobal, LongSetGlobal, GetLocal,
+                                         SetLocal, GetUpValue, SetUpValue, JumpIfFalse, Jump, Loop, True, CloseUpValue, GetProperty, SetProperty, Unknown, Invoke>;
         InstVariant instruction() const;
         size_t offset() const;
         size_t size() const;

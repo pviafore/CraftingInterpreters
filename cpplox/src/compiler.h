@@ -25,10 +25,16 @@ namespace lox {
         Call,
         Primary
     };
+
+    struct ClassCompiler {
+        ClassCompiler* enclosing;
+    };
     class Compiler {
     public:
         enum FunctionType {
             FUNCTION,
+            METHOD,
+            INITIALIZER,
             SCRIPT
         };
 
@@ -37,7 +43,7 @@ namespace lox {
         bool debugMode = false;
 
     private:
-        Compiler(Compiler* compiler);
+        Compiler(Compiler* compiler, FunctionType type);
         using ParseFn = std::function<void(Compiler*, bool)>;
         struct ParseRule {
             ParseFn prefix{};
@@ -64,6 +70,7 @@ namespace lox {
         void andOp(bool);
         void orOp(bool);
         void call(bool);
+        void this_(bool);
         uint8_t argumentList();
 
         void declaration();
@@ -80,6 +87,7 @@ namespace lox {
         void breakStatement();
         void continueStatement();
         void onceStatement();
+        void method();
         void returnStatement();
         void emitLoop(size_t pos);
         void emitReturn();
@@ -135,6 +143,8 @@ namespace lox {
             Vector<size_t> breakLocations = {};
         };
         Vector<Loop> nestedLoops;
+
+        ClassCompiler* classCompiler = nullptr;
     };
 }
 #endif

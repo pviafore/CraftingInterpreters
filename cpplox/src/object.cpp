@@ -77,6 +77,13 @@ namespace lox {
 
     Class::Class(InternedString name) : name(name) {}
     StringView Class::getName() const { return name.string(); }
+    void Class::setMethod(InternedString name, Value v) {
+        methods.insert(name, v);
+    }
+
+    Optional<Value> Class::getMethod(InternedString name) const {
+        return methods.get(name);
+    }
 
     Instance::Instance(SharedPtr<Class> cls) : cls(cls) {}
     StringView Instance::getName() const { return cls->getName(); }
@@ -95,5 +102,17 @@ namespace lox {
 
     void Instance::deleteField(InternedString name) {
         fields.erase(name);
+    }
+    SharedPtr<Class> Instance::getClass() const {
+        return cls;
+    }
+
+    BoundMethod::BoundMethod(Value receiver, Callable method) : receiver(receiver), method(method) {}
+    Callable BoundMethod::getMethod() const {
+        return method;
+    }
+
+    Value BoundMethod::getReceiver() const {
+        return receiver;
     }
 }

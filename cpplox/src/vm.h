@@ -18,9 +18,6 @@ namespace lox {
         RuntimeError = 70
     };
 
-    using Callable = std::variant<SharedPtr<Function>, SharedPtr<Closure>>;
-
-    SharedPtr<Function> getFunction(Callable callable);
     class VM {
     public:
         VM();
@@ -73,8 +70,10 @@ namespace lox {
         void verifyString(size_t stackIndex = 0) const;
         void defineGlobal(const Chunk& chunk, uint32_t constant);
         void defineNative(StringView name, NativeFunction::Func f, size_t argCount);
+        void defineMethod(InternedString name);
         SharedPtr<UpValueObj> captureUpValue(DynamicStack<Value>::iterator);
         void closeUpValues(const DynamicStack<Value>::iterator iter);
+        void bindMethod(SharedPtr<Class> cls, InternedString name);
 
         InterpretResult pushGlobal(const Chunk& chunk, uint32_t constant);
         InterpretResult assignGlobal(const Chunk& chunk, uint32_t constant);
@@ -83,6 +82,8 @@ namespace lox {
         void assignLocal(size_t constant);
         void callValue(Value callee, int argCount);
         void call(Callable func, size_t argCount);
+        void invoke(InternedString name, uint8_t argCount);
+        void invokeFromClass(SharedPtr<Class> cls, InternedString name, uint8_t argCount);
         double popNumber();
         void binaryOp(const Binary& bin);
         DynamicStack<Value> stack;
