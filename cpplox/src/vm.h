@@ -70,7 +70,7 @@ namespace lox {
         void verifyString(size_t stackIndex = 0) const;
         void defineGlobal(const Chunk& chunk, uint32_t constant);
         void defineNative(StringView name, NativeFunction::Func f, size_t argCount);
-        void defineMethod(InternedString name);
+        void defineMethod(InternedString name, bool isInitializer = false);
         SharedPtr<UpValueObj> captureUpValue(DynamicStack<Value>::iterator);
         void closeUpValues(const DynamicStack<Value>::iterator iter);
         void bindMethod(SharedPtr<Class> cls, InternedString name);

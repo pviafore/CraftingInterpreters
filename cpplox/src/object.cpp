@@ -85,6 +85,14 @@ namespace lox {
         return methods.get(name);
     }
 
+    void Class::setInitializer(Value v) {
+        initializer = v;
+    }
+
+    Optional<Value> Class::getInitializer() const {
+        return initializer;
+    }
+
     Instance::Instance(SharedPtr<Class> cls) : cls(cls) {}
     StringView Instance::getName() const { return cls->getName(); }
 

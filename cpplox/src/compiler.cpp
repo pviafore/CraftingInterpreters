@@ -785,7 +785,7 @@ namespace lox {
         }
 
         func(type);
-        emit(OpCode::Method);
+        emit(type == FunctionType::METHOD ? OpCode::Method : OpCode::Initializer);
         emit(constant);
     }
 

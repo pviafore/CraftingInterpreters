@@ -30,6 +30,7 @@ namespace lox {
         LongGetGlobal,
         Invoke,
         Method,
+        Initializer,
         GetProperty,
         SetProperty,
         Greater,
@@ -128,6 +129,10 @@ namespace lox {
     class MethodOp : public _OpAndValueInstruction<uint8_t> {
     public:
         MethodOp(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Method, "OP_METHOD") {}
+    };
+    class Initializer : public _OpAndValueInstruction<uint8_t> {
+    public:
+        Initializer(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Initializer, "OP_INITIALIZER") {}
     };
     uint32_t toAddress(const std::byte* buffer);
     class LongConstant : public _OpAndValueInstruction<uint32_t> {
@@ -343,7 +348,8 @@ namespace lox {
 
         using InstVariant = std::variant<Binary, BinaryPredicate, Call, ClassOp, ClosureOp, Constant, DefineGlobal, GetGlobal, Equal, False, LongConstant,
                                          LongDefineGlobal, LongGetGlobal, Negate, Nil, Not, Print, Pop, Return, MethodOp, SetGlobal, LongSetGlobal, GetLocal,
-                                         SetLocal, GetUpValue, SetUpValue, JumpIfFalse, Jump, Loop, True, CloseUpValue, GetProperty, SetProperty, Unknown, Invoke>;
+                                         SetLocal, GetUpValue, SetUpValue, JumpIfFalse, Jump, Loop, True, CloseUpValue, GetProperty, SetProperty, Unknown, Invoke,
+                                         Initializer>;
         InstVariant instruction() const;
         size_t offset() const;
         size_t size() const;

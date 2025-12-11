@@ -201,6 +201,7 @@ namespace lox {
                             ip.resetBy(l.value());
                             jumped = true; },
                         [&chunk, this](const MethodOp& m) { defineMethod(std::get<InternedString>(chunk.getConstant(m.value()))); },
+                        [&chunk, this](const Initializer& i) { defineMethod(std::get<InternedString>(chunk.getConstant(i.value())), true); },
                         [this](const Negate&) {
                             this->negate();
                         },
@@ -354,7 +355,7 @@ namespace lox {
                 [this, argCount](SharedPtr<Function> func) { call(func, argCount); },
                 [this, argCount](SharedPtr<Class> cls) {
                     stack[stack.size() - argCount - 1] = SharedPtr<Instance>::Make(cls);
-                    auto init = cls->getMethod(InternedString{StringView("init")});
+                    auto init = cls->getInitializer();
                     if (init.hasValue()) {
                         call(getFunction(toCallable(init.value())), argCount);
                     }
@@ -401,10 +402,14 @@ namespace lox {
         }
     }
 
-    void VM::defineMethod(InternedString name) {
+    void VM::defineMethod(InternedString name, bool isInitializer) {
         auto method = stack.peek();
         auto cls = std::get<SharedPtr<Class>>(stack.peek(1));
-        cls->setMethod(name, method);
+        if (isInitializer) {
+            cls->setInitializer(method);
+        } else {
+            cls->setMethod(name, method);
+        }
         stack.pop();
     }
 

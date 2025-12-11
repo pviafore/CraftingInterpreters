@@ -66,6 +66,7 @@ namespace lox {
             [&out, &chunk, &instruction](GetLocal& o) { withRawValue(out, o); },
             [&out, &chunk, &instruction](SetLocal& o) { withRawValue(out, o); },
             [&out, &chunk, &instruction](MethodOp& o) { withConstant(out, chunk, o); },
+            [&out, &chunk, &instruction](Initializer& o) { withConstant(out, chunk, o); },
             [&out, &chunk, &instruction](Invoke& o) { withInvoke(out, chunk, o); },
             [&out, &chunk, &instruction](GetProperty& o) { withRawValue(out, o); },
             [&out, &chunk, &instruction](SetProperty& o) { withRawValue(out, o); },

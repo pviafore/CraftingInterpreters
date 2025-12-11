@@ -98,10 +98,13 @@ namespace lox {
         StringView getName() const;
         void setMethod(InternedString name, Value method);
         Optional<Value> getMethod(InternedString name) const;
+        void setInitializer(Value method);
+        Optional<Value> getInitializer() const;
 
     private:
         InternedString name;
         Table<InternedString, Value> methods;
+        Optional<Value> initializer;
     };
 
     class Instance {

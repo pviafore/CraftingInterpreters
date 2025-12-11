@@ -785,3 +785,19 @@ See #1
 I'm going to guess slots, but let's see what Google can tell us. It seems like there are some caching options to eliminate the hashing. I think what I like the most is 
 JavaScripts creating a hidden shape and offset calculation to just do offsets right into the object
 
+# Chapter 28
+
+1. Implement something faster than a hash table lookup for initializers.
+
+I'll make a new opcode called initializer, which will give a direct access to set an optional field on the class itself. We make the class bigger, but 
+faster lookup for initializer.
+
+2.  How do dynamic languages optimize callsites frequently calling the same calls again and again.
+
+For pure functions, there can be caching and inlining. Some dynamic languages can JIT the codepaths to optimize hot paths that are happening often.
+
+3.  What choice would you make regarding fields shadowing functions.
+
+There is something to be said that it prevents user error for shadowing a function erroneously. I do like preventing users from making mistakes, but it is more 
+mental model to handle things in two different ways. I probably would keep it the same. Very rarely do I try to swap the two at runtime (set a field to a method or vice versa).
+However, I make the mistake of accidentally shadowing a function.
