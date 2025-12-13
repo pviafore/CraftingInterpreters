@@ -100,6 +100,7 @@ namespace lox {
         Optional<Value> getMethod(InternedString name) const;
         void setInitializer(Value method);
         Optional<Value> getInitializer() const;
+        void inherit(const Class& super);
 
     private:
         InternedString name;

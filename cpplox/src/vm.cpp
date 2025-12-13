@@ -187,7 +187,11 @@ namespace lox {
                             stack.pop();
                             stack.push(v);
                         },
-                        [&chunk, &returnCode, this](const GetUpValue& g) { stack.push(*(std::get<SharedPtr<Closure>>(frames.top().getCallable())->getUpValue(g.value())->location)); },
+                        [&chunk, &returnCode, this](const GetUpValue& g) {
+                            Value* value = (std::get<SharedPtr<Closure>>(frames.top().getCallable())->getUpValue(g.value())->location);
+                            assert(value);
+                            stack.push(*value);
+                        },
                         [&chunk, &returnCode, this](const SetUpValue& s) { std::get<SharedPtr<Closure>>(frames.top().getCallable())->setUpValue(s.value(), stack.peek()); },
                         [&ip, &jumped, this](const JumpIfFalse& j) {
                             if (isFalsey(stack.peek())) {
@@ -200,8 +204,24 @@ namespace lox {
                         [&ip, &jumped, this](const Loop& l) {
                             ip.resetBy(l.value());
                             jumped = true; },
-                        [&chunk, this](const MethodOp& m) { defineMethod(std::get<InternedString>(chunk.getConstant(m.value()))); },
+                        [this](const Inherit&) {
+                            auto superclass = stack.peek(1);
+                            if (!std::holds_alternative<SharedPtr<Class>>(superclass)) {
+                                throw Exception("Superclass must be a class.", nullptr);
+                            }
+                            auto subclass = std::get<SharedPtr<Class>>(stack.peek());
+                            subclass->inherit(**std::get<SharedPtr<Class>>(superclass));
+                            stack.pop();
+                        },
+                        [&chunk, this](const MethodOp& m) {
+                            defineMethod(std::get<InternedString>(chunk.getConstant(m.value())));
+                        },
                         [&chunk, this](const Initializer& i) { defineMethod(std::get<InternedString>(chunk.getConstant(i.value())), true); },
+                        [&chunk, this](const GetSuper& g) {
+                            auto name = std::get<InternedString>(chunk.getConstant(g.value()));
+                            auto superclass = std::get<SharedPtr<Class>>(stack.pop());
+                            bindMethod(superclass, name);
+                        },
                         [this](const Negate&) {
                             this->negate();
                         },
@@ -230,6 +250,11 @@ namespace lox {
                         [this, &chunk](const Invoke& i) {
                             auto name = chunk.getConstant(i.value());
                             invoke(std::get<InternedString>(name), i.getArgumentCount());
+                        },
+                        [this, &chunk](const SuperInvoke& i) {
+                            auto name = std::get<InternedString>(chunk.getConstant(i.value()));
+                            auto superclass = std::get<SharedPtr<Class>>(stack.pop());
+                            invokeFromClass(superclass, name, i.getArgumentCount());
                         },
                         [&returnCode](const Unknown&) { returnCode = InterpretResult::CompileError; }},
                     instruction.instruction());
@@ -416,7 +441,7 @@ namespace lox {
     void VM::bindMethod(SharedPtr<Class> cls, InternedString name) {
         auto value = cls->getMethod(name);
         if (!value) {
-            auto s = std::format("Undefined property {}", name);
+            auto s = std::format("Undefined property {}", name.string());
             throw Exception(s.c_str(), nullptr);
         }
 
@@ -447,7 +472,7 @@ namespace lox {
     void VM::invokeFromClass(SharedPtr<Class> cls, InternedString name, uint8_t argCount) {
         auto method = cls->getMethod(name);
         if (!method.hasValue()) {
-            auto s = std::format("Undefined property {}", name);
+            auto s = std::format("Undefined property {}", name.string());
             throw Exception(s.c_str(), nullptr);
         }
         return call(toCallable(method.value()), argCount);

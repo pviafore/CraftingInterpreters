@@ -73,7 +73,7 @@ namespace lox {
         void insert(const Table<K, V>& table) {
             for (auto& entry : table.entries) {
                 if (std::holds_alternative<Entry>(entry)) {
-                    insert(entry.key, entry.value);
+                    insert(std::get<Entry>(entry).key, std::get<Entry>(entry).value);
                 }
             }
         }

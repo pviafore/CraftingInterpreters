@@ -28,6 +28,7 @@ namespace lox {
 
     struct ClassCompiler {
         ClassCompiler* enclosing;
+        bool hasSuperclass = false;
     };
     class Compiler {
     public:
@@ -40,7 +41,7 @@ namespace lox {
 
         Compiler(const String& s);
         SharedPtr<Function> compile();
-        bool debugMode = false;
+        bool debugMode = true;
 
     private:
         Compiler(Compiler* compiler, FunctionType type);
@@ -71,6 +72,7 @@ namespace lox {
         void orOp(bool);
         void call(bool);
         void this_(bool);
+        void super_(bool);
         uint8_t argumentList();
 
         void declaration();

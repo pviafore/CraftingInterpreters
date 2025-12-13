@@ -281,6 +281,7 @@ namespace lox {
             {TokenType::Identifier, {&Compiler::variable}},
             {TokenType::Number, {&Compiler::number}},
             {TokenType::String, {&Compiler::string}},
+            {TokenType::Super, {&Compiler::super_}},
             {TokenType::False, {&Compiler::literal}},
             {TokenType::True, {&Compiler::literal}},
             {TokenType::Nil, {&Compiler::literal}},
@@ -755,7 +756,7 @@ namespace lox {
     void Compiler::classDeclaration() {
         parser->consume(TokenType::Identifier, "Expect class name.");
         auto token = parser->getPreviousToken();
-        auto constant = addIdentifierConstant(parser->getPreviousToken().token, true);
+        auto constant = addIdentifierConstant(token.token, true);
         declareVariable(true);
 
         emit(OpCode::Class);
@@ -765,6 +766,21 @@ namespace lox {
         ClassCompiler compiler;
         compiler.enclosing = classCompiler;
         classCompiler = &compiler;
+
+        if (parser->match(TokenType::Less)) {
+            parser->consume(TokenType::Identifier, "Expect superclass name.");
+            variable(false);
+            if (token.token == parser->getPreviousToken().token) {
+                parser->errorAtPrevious("A class can't inherit from itself");
+            }
+            beginScope();
+            auto place = addLocal("super", true);
+            defineVariable(place);
+
+            emitNamedVariable(token.token, false);
+            emit(OpCode::Inherit);
+            classCompiler->hasSuperclass = true;
+        }
         emitNamedVariable(token.token, false);
 
         parser->consume(TokenType::LeftBrace, "Expect '{' before class body}");
@@ -773,6 +789,9 @@ namespace lox {
         }
         parser->consume(TokenType::RightBrace, "Expect '}' after class body}");
         emit(OpCode::Pop);
+        if (classCompiler->hasSuperclass) {
+            endScope();
+        }
         classCompiler = classCompiler->enclosing;
     }
 
@@ -904,5 +923,28 @@ namespace lox {
             return;
         }
         variable(false);
+    }
+
+    void Compiler::super_(bool) {
+        if (!classCompiler) {
+            throw Exception("Cant use 'super' outside of class", nullptr);
+        } else if (!classCompiler->hasSuperclass) {
+            throw Exception("Can't user 'super' in a class with no superclass", nullptr);
+        }
+        parser->consume(TokenType::Dot, "Expect '.' afer 'super'.");
+        parser->consume(TokenType::Identifier, "Expect superclass method name.");
+        auto name = addIdentifierConstant(parser->getPreviousToken().token, false);
+        emitNamedVariable("this", false);
+        if (parser->match(TokenType::LeftParen)) {
+            uint8_t argCount = argumentList();
+            emitNamedVariable("super", false);
+            emit(OpCode::SuperInvoke);
+            emit(OpCode(name));
+            emit(argCount);
+        } else {
+            emitNamedVariable("super", false);
+            emit(OpCode::GetSuper);
+            emit(name);
+        }
     }
 }

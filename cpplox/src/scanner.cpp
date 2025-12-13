@@ -252,7 +252,7 @@ namespace lox {
             if (ptr - start > 1) {
                 switch (*(start + 1)) {
                 case 'u':
-                    return checkKeyword(2, "uper", TokenType::Super);
+                    return checkKeyword(2, "per", TokenType::Super);
                 case 'w':
                     return checkKeyword(2, "itch", TokenType::Switch);
                 }

@@ -16,7 +16,8 @@ namespace lox {
         out << std::format("{:<32}{}({})", i.name, chunk.getConstant(i.value()), i.value());
     }
 
-    void withInvoke(std::ostringstream& out, const Chunk& chunk, const Invoke& i) {
+    template <typename I>
+    void withInvoke(std::ostringstream& out, const Chunk& chunk, const I& i) {
         out << std::format("{:<32}{}({}) ({} args)", i.name, chunk.getConstant(i.value()), i.value(), i.getArgumentCount());
     }
 
@@ -68,6 +69,8 @@ namespace lox {
             [&out, &chunk, &instruction](MethodOp& o) { withConstant(out, chunk, o); },
             [&out, &chunk, &instruction](Initializer& o) { withConstant(out, chunk, o); },
             [&out, &chunk, &instruction](Invoke& o) { withInvoke(out, chunk, o); },
+            [&out, &chunk, &instruction](SuperInvoke& o) { withInvoke(out, chunk, o); },
+            [&out, &chunk, &instruction](GetSuper& o) { withConstant(out, chunk, o); },
             [&out, &chunk, &instruction](GetProperty& o) { withRawValue(out, o); },
             [&out, &chunk, &instruction](SetProperty& o) { withRawValue(out, o); },
             [&out, &chunk, &instruction](GetUpValue& o) { withRawValue(out, o); },

@@ -93,6 +93,10 @@ namespace lox {
         return initializer;
     }
 
+    void Class::inherit(const Class& super) {
+        methods.insert(super.methods);
+    }
+
     Instance::Instance(SharedPtr<Class> cls) : cls(cls) {}
     StringView Instance::getName() const { return cls->getName(); }
 
