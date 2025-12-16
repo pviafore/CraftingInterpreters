@@ -82,6 +82,9 @@ namespace lox {
     }
 
     Optional<Value> Class::getMethod(InternedString name) const {
+        if (name.string() == "init" && initializer.hasValue()) {
+            return initializer.value();
+        }
         return methods.get(name);
     }
 

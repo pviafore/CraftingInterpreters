@@ -801,3 +801,25 @@ For pure functions, there can be caching and inlining. Some dynamic languages ca
 There is something to be said that it prevents user error for shadowing a function erroneously. I do like preventing users from making mistakes, but it is more 
 mental model to handle things in two different ways. I probably would keep it the same. Very rarely do I try to swap the two at runtime (set a field to a method or vice versa).
 However, I make the mistake of accidentally shadowing a function.
+
+# Chapter 29
+
+1.  How would you address fields stepping on each other when you inherit?
+
+I am a super strong believer that encapsulation is one of the best things that keep a codebase maintainable, and I've become partial to different visibility 
+schemes. If I can designate variables as private, I would like to do so and have them not interfere with base classes. (This also helps with Liskov Substitution
+Principle, as well as reducing coupling -- derived classes are less likely to break when a variable in the base class changes).
+
+With the implementation choices we've made so far, I don't want to add too many more layers of indirection, so I'm going to adopt Python's name-mangling "private"
+ access. Basically, if a field starts with a double under-score (__), then we are going to assume it is part of the class's private fields, and name mangle it so that 
+ it is namespaced into that class.
+
+ Check `compiler.cpp` with references to `manglePrivate`.
+
+ 2. How do langugaes like Ruby handle updating classes that are derived from while still maintaining efficient resource order.
+
+ Ruby maintains a global method cache, where upon determining resolution, it will cache that function call so that it doesn't have to scan inheritance chains anymore. However, when a base class is updated, the cache gets invalidated for any derived entities, which makes it easy to tell when functions need to update their resolution order.
+
+ 3.  Use the inner() semantics of BETA instead of super()
+
+ See the branch cpplox-beta

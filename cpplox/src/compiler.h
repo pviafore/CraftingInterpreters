@@ -117,13 +117,14 @@ namespace lox {
         void markInitialized();
         void beginCompile();
         SharedPtr<Function> endCompile();
+        String manglePrivate(StringView name);
         Scanner scanner;
         SharedPtr<Parser> parser;
         Table<InternedString, size_t> constants;
         HashSet<String> immutables;
 
         struct Local {
-            StringView name;
+            InternedString name;
             Optional<size_t> depth;  // will not have a value if its uninitialized
             bool constant;
             bool isCaptured = false;
@@ -147,6 +148,7 @@ namespace lox {
         Vector<Loop> nestedLoops;
 
         ClassCompiler* classCompiler = nullptr;
+        StringView currentClass = "";
     };
 }
 #endif

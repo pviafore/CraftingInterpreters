@@ -15,7 +15,7 @@ namespace lox {
     }
 
     Compiler::Compiler(const String& s) : scanner(s), parser(SharedPtr<Parser>::Make(scanner.begin())), function(SharedPtr<Function>::Make("<script>")), functionType(FunctionType::SCRIPT) {}
-    Compiler::Compiler(Compiler* enclosing, FunctionType type) : debugMode(enclosing->debugMode), scanner(nullptr), parser(enclosing->parser), depth(enclosing->depth + 1), function(SharedPtr<Function>::Make(parser->getPreviousToken().token)), functionType(type), enclosing(enclosing), classCompiler(enclosing->classCompiler) {
+    Compiler::Compiler(Compiler* enclosing, FunctionType type) : debugMode(enclosing->debugMode), scanner(nullptr), parser(enclosing->parser), depth(enclosing->depth + 1), function(SharedPtr<Function>::Make(parser->getPreviousToken().token)), functionType(type), enclosing(enclosing), classCompiler(enclosing->classCompiler), currentClass(enclosing->currentClass) {
     }
     void Compiler::beginCompile() {
         StringView name = (functionType != FunctionType::FUNCTION ? "this" : ReservedInternal::ProgramState);
@@ -614,13 +614,15 @@ namespace lox {
 
     void Compiler::returnStatement() {
         if (functionType == FunctionType::SCRIPT) {
-            throw Exception("Cannot return from top-level code", nullptr);
+            parser->errorAtPrevious("Cannot return from top-level code");
+            return;
         }
         if (parser->match(TokenType::Semicolon)) {
             emitReturn();
         } else {
             if (functionType == FunctionType::INITIALIZER) {
-                throw Exception("Cannot return a value from an initializer", nullptr);
+                parser->errorAtPrevious("Cannot return a value from an initializer");
+                return;
             }
             expression();
             parser->consume(TokenType::Semicolon, "Expected semicolon after return value");
@@ -699,9 +701,10 @@ namespace lox {
     }
 
     Optional<size_t> Compiler::resolveLocal(StringView name) {
+        auto newName = manglePrivate(name);
         for (int index = locals.size() - 1; index >= 0; --index) {
             Local& l = locals[index];
-            if (name == l.name) {
+            if (StringView(newName) == l.name) {
                 if (!l.depth.hasValue()) {
                     parser->errorAtPrevious("Can't read local variable in own initializer");
                 }
@@ -756,6 +759,8 @@ namespace lox {
     void Compiler::classDeclaration() {
         parser->consume(TokenType::Identifier, "Expect class name.");
         auto token = parser->getPreviousToken();
+        auto oldClass = currentClass;
+        currentClass = token.token;
         auto constant = addIdentifierConstant(token.token, true);
         declareVariable(true);
 
@@ -793,6 +798,7 @@ namespace lox {
             endScope();
         }
         classCompiler = classCompiler->enclosing;
+        currentClass = oldClass;
     }
 
     void Compiler::method() {
@@ -863,13 +869,14 @@ namespace lox {
     }
 
     size_t Compiler::addIdentifierConstant(StringView name, bool isConstant) {
-        if (!constants.get(name).hasValue()) {
-            constants.insert(name, getCurrentChunk()->addConstant(name));
+        auto newName = manglePrivate(name);
+        if (!constants.get(newName).hasValue()) {
+            constants.insert(newName, getCurrentChunk()->addConstant(newName));
         }
         if (isConstant) {
-            immutables.insert(name);
+            immutables.insert(newName);
         }
-        return constants.get(name).value();
+        return constants.get(newName).value();
     }
 
     void Compiler::defineVariable(size_t global) {
@@ -906,8 +913,9 @@ namespace lox {
     }
 
     size_t Compiler::addLocal(StringView name, bool constant) {
+        auto newName = manglePrivate(name);
         try {
-            locals.push_back({name, {}, constant});
+            locals.push_back({newName, {}, constant});
         } catch (std::runtime_error&) {
             parser->errorAtCurrent("Too many local variables in function");
         }
@@ -927,9 +935,11 @@ namespace lox {
 
     void Compiler::super_(bool) {
         if (!classCompiler) {
-            throw Exception("Cant use 'super' outside of class", nullptr);
+            parser->errorAtPrevious("Cant use 'super' outside of class");
+            return;
         } else if (!classCompiler->hasSuperclass) {
-            throw Exception("Can't user 'super' in a class with no superclass", nullptr);
+            parser->errorAtPrevious("Can't user 'super' in a class with no superclass");
+            return;
         }
         parser->consume(TokenType::Dot, "Expect '.' afer 'super'.");
         parser->consume(TokenType::Identifier, "Expect superclass method name.");
@@ -946,5 +956,14 @@ namespace lox {
             emit(OpCode::GetSuper);
             emit(name);
         }
+    }
+
+    String Compiler::manglePrivate(StringView name) {
+        if (currentClass.size()) {
+            if (name.size() >= 2 && name.begin()[0] == '_' && name.begin()[1] == '_') {
+                return String("__") + currentClass + "_" + name;
+            }
+        }
+        return name;
     }
 }

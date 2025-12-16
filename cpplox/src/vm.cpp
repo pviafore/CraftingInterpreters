@@ -188,6 +188,9 @@ namespace lox {
                             stack.push(v);
                         },
                         [&chunk, &returnCode, this](const GetUpValue& g) {
+                            if (!std::holds_alternative<SharedPtr<Closure>>(frames.top().getCallable())) {
+                                throw Exception("Not a closure", nullptr);
+                            }
                             Value* value = (std::get<SharedPtr<Closure>>(frames.top().getCallable())->getUpValue(g.value())->location);
                             assert(value);
                             stack.push(*value);
@@ -382,7 +385,7 @@ namespace lox {
                     stack[stack.size() - argCount - 1] = SharedPtr<Instance>::Make(cls);
                     auto init = cls->getInitializer();
                     if (init.hasValue()) {
-                        call(getFunction(toCallable(init.value())), argCount);
+                        call(toCallable(init.value()), argCount);
                     }
                 },
                 [this, argCount](SharedPtr<BoundMethod> method) { stack[stack.size() - argCount - 1] = method->getReceiver(); call(method->getMethod(), argCount); },
