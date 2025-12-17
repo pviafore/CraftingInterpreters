@@ -229,7 +229,15 @@ namespace lox {
         case 'e':
             return checkKeyword(1, "lse", TokenType::Else);
         case 'i':
-            return checkKeyword(1, "f", TokenType::If);
+            if (ptr - start > 1) {
+                switch (*(start + 1)) {
+                case 'f':
+                    return checkKeyword(2, "", TokenType::If);
+                case 'n':
+                    return checkKeyword(2, "ner", TokenType::Inner);
+                }
+            }
+            break;
         case 'n':
             return checkKeyword(1, "il", TokenType::Nil);
         case 'o':
@@ -251,8 +259,6 @@ namespace lox {
         case 's':
             if (ptr - start > 1) {
                 switch (*(start + 1)) {
-                case 'u':
-                    return checkKeyword(2, "per", TokenType::Super);
                 case 'w':
                     return checkKeyword(2, "itch", TokenType::Switch);
                 }

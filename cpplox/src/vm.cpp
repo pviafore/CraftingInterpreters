@@ -213,18 +213,13 @@ namespace lox {
                                 throw Exception("Superclass must be a class.", nullptr);
                             }
                             auto subclass = std::get<SharedPtr<Class>>(stack.peek());
-                            subclass->inherit(**std::get<SharedPtr<Class>>(superclass));
+                            subclass->inherit(*std::get<SharedPtr<Class>>(superclass));
                             stack.pop();
                         },
                         [&chunk, this](const MethodOp& m) {
                             defineMethod(std::get<InternedString>(chunk.getConstant(m.value())));
                         },
                         [&chunk, this](const Initializer& i) { defineMethod(std::get<InternedString>(chunk.getConstant(i.value())), true); },
-                        [&chunk, this](const GetSuper& g) {
-                            auto name = std::get<InternedString>(chunk.getConstant(g.value()));
-                            auto superclass = std::get<SharedPtr<Class>>(stack.pop());
-                            bindMethod(superclass, name);
-                        },
                         [this](const Negate&) {
                             this->negate();
                         },
@@ -254,10 +249,11 @@ namespace lox {
                             auto name = chunk.getConstant(i.value());
                             invoke(std::get<InternedString>(name), i.getArgumentCount());
                         },
-                        [this, &chunk](const SuperInvoke& i) {
-                            auto name = std::get<InternedString>(chunk.getConstant(i.value()));
-                            auto superclass = std::get<SharedPtr<Class>>(stack.pop());
-                            invokeFromClass(superclass, name, i.getArgumentCount());
+                        [this, &chunk](const InnerInvoke& i) {
+                            auto methodName = std::get<InternedString>(chunk.getConstant(i.value()));
+                            auto superclassName = std::get<InternedString>(chunk.getConstant(i.getMethodName()));
+                            auto instance = std::get<SharedPtr<Instance>>(stack.peek(i.getArgumentCount()));
+                            innerInvoke(instance->getClass(), superclassName, methodName, i.getArgumentCount());
                         },
                         [&returnCode](const Unknown&) { returnCode = InterpretResult::CompileError; }},
                     instruction.instruction());
@@ -474,6 +470,15 @@ namespace lox {
 
     void VM::invokeFromClass(SharedPtr<Class> cls, InternedString name, uint8_t argCount) {
         auto method = cls->getMethod(name);
+        if (!method.hasValue()) {
+            auto s = std::format("Undefined property {}", name.string());
+            throw Exception(s.c_str(), nullptr);
+        }
+        return call(toCallable(method.value()), argCount);
+    }
+
+    void VM::innerInvoke(SharedPtr<Class> cls, InternedString superclassName, InternedString name, uint8_t argCount) {
+        auto method = cls->getMethod(name, superclassName);
         if (!method.hasValue()) {
             auto s = std::format("Undefined property {}", name.string());
             throw Exception(s.c_str(), nullptr);

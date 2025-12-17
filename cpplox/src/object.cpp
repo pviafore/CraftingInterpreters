@@ -81,11 +81,21 @@ namespace lox {
         methods.insert(name, v);
     }
 
-    Optional<Value> Class::getMethod(InternedString name) const {
+    Optional<Value> Class::getMethod(InternedString name, InternedString sentinel) const {
         if (name.string() == "init" && initializer.hasValue()) {
             return initializer.value();
         }
-        return methods.get(name);
+        auto method = methods.get(name);
+        auto super = superclass;
+        while (super && super->getName() != sentinel) {
+            auto value = superclass->getMethod(name);
+            if (value) {
+                method = value;
+            }
+            super = super->superclass;
+        }
+
+        return method;
     }
 
     void Class::setInitializer(Value v) {
@@ -96,8 +106,8 @@ namespace lox {
         return initializer;
     }
 
-    void Class::inherit(const Class& super) {
-        methods.insert(super.methods);
+    void Class::inherit(SharedPtr<Class> super) {
+        superclass = super;
     }
 
     Instance::Instance(SharedPtr<Class> cls) : cls(cls) {}

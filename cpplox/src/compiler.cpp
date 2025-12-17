@@ -15,7 +15,7 @@ namespace lox {
     }
 
     Compiler::Compiler(const String& s) : scanner(s), parser(SharedPtr<Parser>::Make(scanner.begin())), function(SharedPtr<Function>::Make("<script>")), functionType(FunctionType::SCRIPT) {}
-    Compiler::Compiler(Compiler* enclosing, FunctionType type) : debugMode(enclosing->debugMode), scanner(nullptr), parser(enclosing->parser), depth(enclosing->depth + 1), function(SharedPtr<Function>::Make(parser->getPreviousToken().token)), functionType(type), enclosing(enclosing), classCompiler(enclosing->classCompiler), currentClass(enclosing->currentClass) {
+    Compiler::Compiler(Compiler* enclosing, FunctionType type) : debugMode(enclosing->debugMode), scanner(nullptr), parser(enclosing->parser), depth(enclosing->depth + 1), function(SharedPtr<Function>::Make(parser->getPreviousToken().token)), functionType(type), enclosing(enclosing), classCompiler(enclosing->classCompiler), currentClass(enclosing->currentClass), methodName(enclosing->methodName) {
     }
     void Compiler::beginCompile() {
         StringView name = (functionType != FunctionType::FUNCTION ? "this" : ReservedInternal::ProgramState);
@@ -281,7 +281,7 @@ namespace lox {
             {TokenType::Identifier, {&Compiler::variable}},
             {TokenType::Number, {&Compiler::number}},
             {TokenType::String, {&Compiler::string}},
-            {TokenType::Super, {&Compiler::super_}},
+            {TokenType::Inner, {&Compiler::inner}},
             {TokenType::False, {&Compiler::literal}},
             {TokenType::True, {&Compiler::literal}},
             {TokenType::Nil, {&Compiler::literal}},
@@ -773,18 +773,15 @@ namespace lox {
         classCompiler = &compiler;
 
         if (parser->match(TokenType::Less)) {
+            classCompiler->hasSuperclass = true;
             parser->consume(TokenType::Identifier, "Expect superclass name.");
             variable(false);
             if (token.token == parser->getPreviousToken().token) {
                 parser->errorAtPrevious("A class can't inherit from itself");
             }
             beginScope();
-            auto place = addLocal("super", true);
-            defineVariable(place);
 
             emitNamedVariable(token.token, false);
-            emit(OpCode::Inherit);
-            classCompiler->hasSuperclass = true;
         }
         emitNamedVariable(token.token, false);
 
@@ -795,6 +792,7 @@ namespace lox {
         parser->consume(TokenType::RightBrace, "Expect '}' after class body}");
         emit(OpCode::Pop);
         if (classCompiler->hasSuperclass) {
+            emit(OpCode::Inherit);
             endScope();
         }
         classCompiler = classCompiler->enclosing;
@@ -802,7 +800,9 @@ namespace lox {
     }
 
     void Compiler::method() {
+        auto oldMethodName = methodName;
         parser->consume(TokenType::Identifier, "Expect method name");
+        methodName = parser->getPreviousToken().token;
         auto constant = addIdentifierConstant(parser->getPreviousToken().token, true);
         FunctionType type = FunctionType::METHOD;
         if (parser->getPreviousToken().token == "init") {
@@ -812,6 +812,7 @@ namespace lox {
         func(type);
         emit(type == FunctionType::METHOD ? OpCode::Method : OpCode::Initializer);
         emit(constant);
+        methodName = oldMethodName;
     }
 
     void Compiler::funDeclaration() {
@@ -933,29 +934,21 @@ namespace lox {
         variable(false);
     }
 
-    void Compiler::super_(bool) {
+    void Compiler::inner(bool) {
         if (!classCompiler) {
-            parser->errorAtPrevious("Cant use 'super' outside of class");
-            return;
-        } else if (!classCompiler->hasSuperclass) {
-            parser->errorAtPrevious("Can't user 'super' in a class with no superclass");
+            parser->errorAtPrevious("Cant use 'inner' outside of class");
             return;
         }
-        parser->consume(TokenType::Dot, "Expect '.' afer 'super'.");
-        parser->consume(TokenType::Identifier, "Expect superclass method name.");
-        auto name = addIdentifierConstant(parser->getPreviousToken().token, false);
         emitNamedVariable("this", false);
-        if (parser->match(TokenType::LeftParen)) {
-            uint8_t argCount = argumentList();
-            emitNamedVariable("super", false);
-            emit(OpCode::SuperInvoke);
-            emit(OpCode(name));
-            emit(argCount);
-        } else {
-            emitNamedVariable("super", false);
-            emit(OpCode::GetSuper);
-            emit(name);
-        }
+        parser->consume(TokenType::LeftParen, "Expect '(' after inner");
+        uint8_t argCount = argumentList();
+        auto pos = addIdentifierConstant(methodName, false);
+        auto name = addIdentifierConstant(currentClass, false);
+        markInitialized();
+        emit(OpCode::InnerInvoke);
+        emit(pos);
+        emit(name);
+        emit(argCount);
     }
 
     String Compiler::manglePrivate(StringView name) {

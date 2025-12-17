@@ -72,7 +72,7 @@ namespace lox {
         void orOp(bool);
         void call(bool);
         void this_(bool);
-        void super_(bool);
+        void inner(bool);
         uint8_t argumentList();
 
         void declaration();
@@ -149,6 +149,7 @@ namespace lox {
 
         ClassCompiler* classCompiler = nullptr;
         StringView currentClass = "";
+        StringView methodName = "";
     };
 }
 #endif

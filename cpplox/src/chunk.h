@@ -28,14 +28,13 @@ namespace lox {
         GetLocal,
         GetUpValue,
         LongGetGlobal,
-        GetSuper,
         Invoke,
         Inherit,
         Method,
         Initializer,
         GetProperty,
         SetProperty,
-        SuperInvoke,
+        InnerInvoke,
         Greater,
         JumpIfFalse,
         Jump,
@@ -123,16 +122,20 @@ namespace lox {
     private:
         uint8_t argCount;
     };
-    class SuperInvoke : public _OpAndValueInstruction<uint8_t> {
+    class InnerInvoke : public _OpAndValueInstruction<uint8_t> {
     public:
-        SuperInvoke(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::SuperInvoke, "OP_SUPER_INVOKE"), argCount(uint8_t(*(buffer + 2))) {
-            size = 3;
+        InnerInvoke(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::InnerInvoke, "OP_INNER_INVOKE"), methodName(uint8_t(*(buffer + 2))), argCount(uint8_t(*(buffer + 3))) {
+            size = 4;
         }
         uint8_t getArgumentCount() const {
             return argCount;
         }
+        uint8_t getMethodName() const {
+            return methodName;
+        }
 
     private:
+        uint8_t methodName;
         uint8_t argCount;
     };
 
@@ -146,10 +149,6 @@ namespace lox {
         MethodOp(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Method, "OP_METHOD") {}
     };
 
-    class GetSuper : public _OpAndValueInstruction<uint8_t> {
-    public:
-        GetSuper(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::GetSuper, "OP_GET_SUPER") {}
-    };
     class Initializer : public _OpAndValueInstruction<uint8_t> {
     public:
         Initializer(const std::byte* buffer) : _OpAndValueInstruction<uint8_t>(buffer, OpCode::Initializer, "OP_INITIALIZER") {}
@@ -374,7 +373,7 @@ namespace lox {
         using InstVariant = std::variant<Binary, BinaryPredicate, Call, ClassOp, ClosureOp, Constant, DefineGlobal, GetGlobal, Equal, False, LongConstant,
                                          LongDefineGlobal, LongGetGlobal, Negate, Nil, Not, Print, Pop, Return, MethodOp, SetGlobal, LongSetGlobal, GetLocal,
                                          SetLocal, GetUpValue, SetUpValue, JumpIfFalse, Jump, Loop, True, CloseUpValue, GetProperty, SetProperty, Unknown, Invoke,
-                                         Initializer, Inherit, GetSuper, SuperInvoke>;
+                                         Initializer, Inherit, InnerInvoke>;
         InstVariant instruction() const;
         size_t offset() const;
         size_t size() const;

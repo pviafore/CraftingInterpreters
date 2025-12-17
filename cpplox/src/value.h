@@ -97,15 +97,16 @@ namespace lox {
 
         StringView getName() const;
         void setMethod(InternedString name, Value method);
-        Optional<Value> getMethod(InternedString name) const;
+        Optional<Value> getMethod(InternedString name, InternedString superclassName = String("")) const;
         void setInitializer(Value method);
         Optional<Value> getInitializer() const;
-        void inherit(const Class& super);
+        void inherit(SharedPtr<Class> super);
 
     private:
         InternedString name;
         Table<InternedString, Value> methods;
         Optional<Value> initializer;
+        SharedPtr<Class> superclass = nullptr;
     };
 
     class Instance {

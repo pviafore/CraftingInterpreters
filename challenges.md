@@ -823,3 +823,6 @@ With the implementation choices we've made so far, I don't want to add too many 
  3.  Use the inner() semantics of BETA instead of super()
 
  See the branch cpplox-beta
+
+ In general, we want to inherit methods after all the method definitions, and save these inherited methods separate from our methods. When we see a function call, 
+ we need to call the inherited methods if they exist first. Also at runtime, if we an inner function, we need to know the current instance type, what class we are currently calling the function in, and argument count. Then we walk the class up until right before our current superclass, and execute that method instead.

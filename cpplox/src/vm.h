@@ -84,6 +84,7 @@ namespace lox {
         void call(Callable func, size_t argCount);
         void invoke(InternedString name, uint8_t argCount);
         void invokeFromClass(SharedPtr<Class> cls, InternedString name, uint8_t argCount);
+        void innerInvoke(SharedPtr<Class> cls, InternedString superclassName, InternedString name, uint8_t argCount);
         double popNumber();
         void binaryOp(const Binary& bin);
         DynamicStack<Value> stack;
